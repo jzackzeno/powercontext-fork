@@ -166,6 +166,12 @@ from powercontext.builtin.runtime._scope_cache import (
     ScopeCacheObserver,
     ScopeEvictor,
 )
+from powercontext.builtin.runtime.context_pack import (
+    INCREMENTAL_CHUNK_BYTES,
+    ContextPack,
+    ContextPackDelta,
+    ContextPackError,
+)
 from powercontext.builtin.runtime.decision_model import DecisionModel
 from powercontext.builtin.runtime.errors import InvalidRuntimeRequestError, TopicMemoryProcessingUnavailableError
 from powercontext.builtin.runtime.models import (
@@ -846,6 +852,30 @@ class ScopedContextApplication:
             if authorize_scopes is not None:
                 await authorize_scopes((self.scope_id, *scope.context_references))
             return await self._prepare(request, scope)
+
+    async def prepare_incremental(
+        self,
+        request: PrepareContextRequest,
+        /,
+        *,
+        base_pack: ContextPack | None = None,
+    ) -> ContextPack | ContextPackDelta:
+        """Prepare context as a full pack, or as a delta against ``base_pack``.
+
+        The target content always comes from the ordinary :meth:`prepare`
+        path, so text and citations keep their usual semantics. A legitimate
+        empty result (``content is None``) becomes the empty pack. Without a
+        base pack the full pack is returned; with one, only the shared chunk
+        prefix and the appended suffix travel.
+        """
+
+        prepared = await self.prepare(request)
+        target = ContextPack.from_content(prepared.content or "", chunk_bytes=INCREMENTAL_CHUNK_BYTES)
+        if base_pack is None:
+            return target
+        if not isinstance(base_pack, ContextPack):
+            raise ContextPackError("base_pack must be a context pack")  # noqa: TRY003
+        return ContextPackDelta.between(base_pack, target)
 
     async def _prepare(self, request: PrepareContextRequest, scope: ScopeDescriptor, /) -> PreparedContext:
         build, effort = await self._prepare_build(request, scope)
