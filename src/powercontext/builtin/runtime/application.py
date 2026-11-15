@@ -167,7 +167,6 @@ from powercontext.builtin.runtime._scope_cache import (
     ScopeEvictor,
 )
 from powercontext.builtin.runtime.context_pack import (
-    INCREMENTAL_CHUNK_BYTES,
     ContextPack,
     ContextPackDelta,
     ContextPackError,
@@ -870,7 +869,7 @@ class ScopedContextApplication:
         """
 
         prepared = await self.prepare(request, authorize_scopes=authorize_scopes)
-        target = ContextPack.from_content(prepared.content or "", chunk_bytes=INCREMENTAL_CHUNK_BYTES)
+        target = ContextPack.from_content(prepared.content or "")
         if base_pack is None:
             return target
         if not isinstance(base_pack, ContextPack):

@@ -36,15 +36,6 @@ _PACK_SCHEMA = "powercontext.context-pack.v1"
 _DELTA_SCHEMA = "powercontext.context-pack-delta.v1"
 _DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 
-#: Chunk size used when a scope prepares incrementally. Smaller than the
-#: 512-byte ``from_content`` default so that a mid-content change wastes less
-#: of the shared prefix: only the partial chunk at the divergence point is
-#: resent, while per-chunk framing stays small relative to the content.
-#: 128 bytes keeps a ~400-byte stable header prefix (three full chunks) in
-#: the common case where the first item changes, without the framing cost
-#: of much smaller chunks.
-INCREMENTAL_CHUNK_BYTES = 128
-
 
 class ContextPackError(ValueError):
     """A context-pack protocol or chunking violation."""
