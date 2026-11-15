@@ -856,9 +856,9 @@ class ScopedContextApplication:
     async def prepare_incremental(
         self,
         request: PrepareContextRequest,
-        /,
-        *,
         base_pack: ContextPack | None = None,
+        *,
+        authorize_scopes: Callable[[tuple[str, ...]], Awaitable[None]] | None = None,
     ) -> ContextPack | ContextPackDelta:
         """Prepare context as a full pack, or as a delta against ``base_pack``.
 
@@ -869,7 +869,7 @@ class ScopedContextApplication:
         prefix and the appended suffix travel.
         """
 
-        prepared = await self.prepare(request)
+        prepared = await self.prepare(request, authorize_scopes=authorize_scopes)
         target = ContextPack.from_content(prepared.content or "", chunk_bytes=INCREMENTAL_CHUNK_BYTES)
         if base_pack is None:
             return target

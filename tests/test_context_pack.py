@@ -160,6 +160,17 @@ def test_apply_rejects_prefix_overflow_and_target_mismatch() -> None:
         apply_context_pack_delta(base, ContextPackDelta("sha256:" + "0" * 64, delta.target_digest, 1, (b"b",)))
 
 
+def test_direct_construction_normalizes_sequences() -> None:
+    pack = ContextPack.build((b"a", b"b"))
+    rebuilt = ContextPack(items=cast("tuple[bytes, ...]", [b"a", b"b"]), digest=pack.digest, byte_count=pack.byte_count)
+    assert rebuilt == pack
+    assert isinstance(rebuilt.items, tuple)
+    delta = ContextPackDelta(pack.digest, pack.digest, 2, cast("tuple[bytes, ...]", [b"a", b"b"]))
+    assert isinstance(delta.appended, tuple)
+    assert delta.appended == (b"a", b"b")
+    assert ContextPack.build(b"alpha") == ContextPack.build((b"alpha",))
+
+
 @pytest.mark.asyncio
 async def test_prepare_incremental_empty_and_unchanged_rounds() -> None:
     async with open_builtin_runtime(BuiltinConfig(), candidate_pipeline=_CandidatePipeline()) as runtime:
@@ -181,3 +192,15 @@ async def test_prepare_incremental_empty_and_unchanged_rounds() -> None:
         assert apply_context_pack_delta(first, second) == first
         with pytest.raises(ContextPackError):
             await context.prepare_incremental(request, base_pack=cast(ContextPack, "not-a-pack"))
+        positional = await context.prepare_incremental(request, first)
+        assert isinstance(positional, ContextPackDelta)
+        assert apply_context_pack_delta(first, positional) == first
+        keyword_request = await context.prepare_incremental(request=request, base_pack=first)
+        assert isinstance(keyword_request, ContextPackDelta)
+
+        async def _allow(_scopes: tuple[str, ...]) -> None:
+            return None
+
+        authorized = await context.prepare_incremental(request, authorize_scopes=_allow)
+        assert isinstance(authorized, ContextPack)
+        assert authorized == first

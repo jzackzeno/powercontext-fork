@@ -58,10 +58,16 @@ class ContextPack:
     digest: str
     byte_count: int
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.items, tuple):
+            object.__setattr__(self, "items", tuple(self.items))
+
     @classmethod
-    def build(cls, items: tuple[bytes, ...] | list[bytes]) -> ContextPack:
+    def build(cls, items: tuple[bytes, ...] | list[bytes] | bytes) -> ContextPack:
         """Build a complete pack from raw chunks."""
 
+        if isinstance(items, (bytes, bytearray, memoryview)):
+            items = (bytes(items),)
         normalized = tuple(_require_chunk(item) for item in items)
         encoded = [base64.b64encode(item).decode("ascii") for item in normalized]
         digest = _pack_digest(encoded)
@@ -136,6 +142,10 @@ class ContextPackDelta:
     target_digest: str
     prefix_items: int
     appended: tuple[bytes, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.appended, tuple):
+            object.__setattr__(self, "appended", tuple(self.appended))
 
     @classmethod
     def between(cls, base: ContextPack, target: ContextPack) -> ContextPackDelta:
