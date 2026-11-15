@@ -47,40 +47,27 @@ class ContextTextItem:
     truncated: bool = False
 
 
-# Plugin families are titled with their family name.
-_TITLES = {"memory": "Memory", "experience": "Experience", "profile": "Profile", "topic-memory": "Topic Memory"}
-
-
 def render_context_text(items: Sequence[ContextTextItem], assembly: ContextAssembly) -> str:
     """Render already selected entries without interpreting historical Markdown."""
 
     parts = ["# PowerContext historical context", TRUST_POLICY, _BEGIN_MARKER]
     for section in assembly.sections:
-        selected_families = {"memory", "atomic-memory"} if section.family == "memory" else {section.family}
-        included = [item for item in items if item.artifact.artifact.family in selected_families]
+        included = [item for item in items if item.artifact.artifact.family == section.family]
         if not included:
             continue
-        title = _TITLES.get(section.family, section.family)
+        title = {
+            "memory": "Memory",
+            "experience": "Experience",
+            "profile": "Profile",
+            "topic-memory": "Topic Memory",
+        }[section.family]
         parts.append(f"## {title}")
         for number, item in enumerate(included, start=1):
-            parts.extend(_item_parts(title, number, item, assembly))
+            parts.append(f"### {title} {number}")
+            parts.append(_metadata(item, assembly))
+            parts.append("\n".join(f">     {line}" for line in item.content.split("\n")))
     parts.append(_END_MARKER)
     return "\n\n".join(parts)
-
-
-def rendered_text_fragment_bytes(item: ContextTextItem, assembly: ContextAssembly, number: int) -> int:
-    """Measure the rendered item, excluding the separators between items."""
-    family = item.artifact.artifact.family
-    title = _TITLES.get("memory" if family == "atomic-memory" else family, family)
-    return len("\n\n".join(_item_parts(title, number, item, assembly)).encode("utf-8"))
-
-
-def _item_parts(title: str, number: int, item: ContextTextItem, assembly: ContextAssembly) -> tuple[str, str, str]:
-    return (
-        f"### {title} {number}",
-        _metadata(item, assembly),
-        "\n".join(f">     {line}" for line in item.content.split("\n")),
-    )
 
 
 @dataclass(frozen=True)
@@ -139,12 +126,6 @@ def fit_context_text_item(
     if len(best.content.encode("utf-8")) < _MIN_TRUNCATED_BODY_BYTES:
         return FitOutcome(dropped_below_min_bytes=True)
     return FitOutcome(item=best)
-
-
-def display_body_bytes(content: str) -> int:
-    """Measure the complete display body of ``content``: normalized, escaped, and not yet truncated."""
-
-    return len("".join(_body_chunks(content)).encode("utf-8"))
 
 
 def _body_chunks(content: str) -> tuple[str, ...]:

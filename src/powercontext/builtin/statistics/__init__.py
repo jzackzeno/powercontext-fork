@@ -17,8 +17,6 @@
 from powercontext.builtin.statistics.models import (
     MAX_RECURRENCE_TOP_REVISIONS,
     ArtifactInventoryStatistics,
-    BootstrapDeliveryReading,
-    BootstrapDeliveryStatistics,
     CandidateFamilyCount,
     CandidateInventoryStatistics,
     FamilyCount,
@@ -32,7 +30,6 @@ from powercontext.builtin.statistics.models import (
     ModelUsagePurposeBreakdown,
     ModelUsageStatistics,
     ModelUsageValue,
-    RecallEffortMeasurement,
     RecallTokenDay,
     RecallTokenMeasurement,
     RecallTokenStatistics,
@@ -50,8 +47,6 @@ from powercontext.builtin.statistics.models import (
 __all__ = [
     "MAX_RECURRENCE_TOP_REVISIONS",
     "ArtifactInventoryStatistics",
-    "BootstrapDeliveryReading",
-    "BootstrapDeliveryStatistics",
     "CandidateFamilyCount",
     "CandidateInventoryStatistics",
     "FamilyCount",
@@ -65,7 +60,6 @@ __all__ = [
     "ModelUsagePurposeBreakdown",
     "ModelUsageStatistics",
     "ModelUsageValue",
-    "RecallEffortMeasurement",
     "RecallTokenDay",
     "RecallTokenMeasurement",
     "RecallTokenStatistics",

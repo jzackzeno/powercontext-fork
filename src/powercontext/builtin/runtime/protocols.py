@@ -39,11 +39,7 @@ TraceAttribute = str | bool | int | float
 
 
 class RuntimeSpan(Protocol):
-    """Record bounded attributes and a deferred outcome for one internal Runtime stage.
-
-    Adapters may expose an existing ``trace_id`` for optional diagnostic correlation;
-    callers must tolerate its absence. It is not proof of sampling or trace storage.
-    """
+    """Record bounded attributes and a deferred outcome for one internal Runtime stage."""
 
     def set_attributes(self, attributes: Mapping[str, TraceAttribute], /) -> None: ...
 
@@ -98,7 +94,7 @@ class RemoteIngestion(Protocol):
 class BuiltinTriggers(Protocol):
     """Atomically execute the built-in Trigger policies for one scope."""
 
-    async def flush(self, *, limit: int, atomic_context=None) -> MemoryFlushResult: ...
+    async def flush(self, *, limit: int) -> MemoryFlushResult: ...
 
     async def cursor(self) -> SourceCursor: ...
 

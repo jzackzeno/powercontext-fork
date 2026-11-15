@@ -38,8 +38,7 @@ from powercontext.client.transport_policy import (
 from powercontext.transport import is_loopback_host
 
 if TYPE_CHECKING:
-    from powercontext.cli.authorization import SetupAuthorizationStatus
-    from powercontext.cli.dsh_runtime import DshTarget
+    from powercontext.cli.system import Diagnostic
 
 
 setup_environment_file: ContextVar[Path | None] = ContextVar("setup_environment_file", default=None)
@@ -50,12 +49,6 @@ class SetupTransport:
     host: str
     server_url: str
     allow_insecure_http: bool
-    endpoint_explicit: bool = False
-
-
-def _setup_endpoint_environment_names(host: str) -> tuple[str, ...]:
-    prefix = "POWERCONTEXT_" + ("CLAUDE" if host == "claude-code" else host.upper().replace("-", "_")) + "_"
-    return (prefix + "BASE_URL", prefix + "SERVER_URL", prefix + "ENDPOINT", "POWERCONTEXT_CLIENT_SERVER_URL")
 
 
 def is_remote_http(server_url: str) -> bool:
@@ -71,33 +64,25 @@ def prepare_setup_transport(
     server_url: str | None = None,
     allow_insecure_http: bool | None = None,
     json_output: bool = False,
-    dsh_target: DshTarget | None = None,
-    native_endpoint: str | None = None,
 ) -> SetupTransport:
     """Resolve and confirm the endpoint before any installation side effects."""
 
     from powercontext.cli.system import SetupError
 
     try:
-        endpoint_explicit = server_url is not None or any(
-            values.get(name)
-            for values in (setup_environment(), os.environ)
-            for name in _setup_endpoint_environment_names(host)
-        )
-        native = {}
         if host == "dsh":
-            from powercontext.cli.dsh_transport import read_dsh_settings
+            from powercontext.cli.native_transport import validate_dsh_setup_transport
 
-            native = read_dsh_settings(
-                profile=dsh_target.profile if dsh_target else "web",
-                prospective=True,
-                executable=dsh_target.command if dsh_target else None,
-            )
+            validate_dsh_setup_transport()
         prefix = "POWERCONTEXT_" + ("CLAUDE" if host == "claude-code" else host.upper().replace("-", "_")) + "_"
-        server_url = resolve_setup_endpoint(
-            host, server_url=server_url, native_endpoint=native_endpoint if host == "minimax" else native.get("baseUrl")
-        )
-        allow_insecure_http = _setup_consent(host, server_url, allow_insecure_http, native)
+        server_url = resolve_setup_endpoint(host, server_url=server_url)
+        loaded = setup_environment()
+        if allow_insecure_http is None:
+            consent_keys = (prefix + "ALLOW_INSECURE_HTTP", "POWERCONTEXT_CLIENT_ALLOW_INSECURE_HTTP")
+            if not any(key in os.environ for key in consent_keys):
+                configured_consent = next((loaded[key] for key in consent_keys if key in loaded), None)
+                if configured_consent is not None:
+                    allow_insecure_http = parse_client_boolean(configured_consent)
         endpoint, allowed = resolve_client_transport(
             host, server_url=server_url, allow_insecure_http=allow_insecure_http
         )
@@ -138,46 +123,12 @@ def prepare_setup_transport(
             "protected in transit. TLS verification and Server authentication remain unchanged.",
             err=True,
         )
-    if host == "kimi-code":
-        from powercontext.cli.kimi_code import _endpoint
-
-        endpoint = _endpoint(endpoint)
-    if host == "zcode":
-        from powercontext.cli.zcode import _endpoint
-
-        endpoint = _endpoint(endpoint)
-    if host == "dsh":
-        from powercontext.cli.dsh_transport import validate_dsh_setup_transport
-
-        try:
-            validate_dsh_setup_transport(native, endpoint, allowed)
-        except ValueError as error:
-            raise SetupError(str(error)) from error
-    return SetupTransport(host, endpoint, allowed, endpoint_explicit=endpoint_explicit)
-
-
-def _setup_consent(host: str, endpoint: str, requested: bool | None, native: dict[str, Any]) -> bool | None:
-    """Select setup consent without allowing saved consent to override a native refusal."""
-    loaded = setup_environment()
-    if requested is not None:
-        return requested
-    prefix = "POWERCONTEXT_" + ("CLAUDE" if host == "claude-code" else host.upper().replace("-", "_")) + "_"
-    keys = (prefix + "ALLOW_INSECURE_HTTP", "POWERCONTEXT_CLIENT_ALLOW_INSECURE_HTTP")
-    if any(key in os.environ for key in keys):
-        return None  # resolve_client_transport reads the runtime environment.
-    value = next((loaded[key] for key in keys if key in loaded), None)
-    if value is not None:
-        return parse_client_boolean(value)
-    if host == "dsh":
-        from powercontext.cli.dsh_transport import matching_dsh_consent
-
-        return matching_dsh_consent(native, endpoint)
-    return None
+    return SetupTransport(host, endpoint, allowed)
 
 
 def setup_environment() -> dict[str, str]:
     """Read setup configuration without executing shell code or changing the process."""
-    from powercontext.env_file import read_environment_file
+    from powercontext.cli.env_file import read_environment_file
 
     explicit = setup_environment_file.get()
     path = explicit.expanduser() if explicit is not None else Path.cwd() / ".env"
@@ -190,7 +141,8 @@ def setup_environment() -> dict[str, str]:
 def _explicit_setup_endpoint(host: str, server_url: str) -> str:
     """Honor a chosen URL only when inherited runtime overrides cannot undo it."""
     endpoint = normalize_client_url(server_url).removesuffix("/mcp").rstrip("/")
-    keys = _setup_endpoint_environment_names(host)
+    prefix = "POWERCONTEXT_" + ("CLAUDE" if host == "claude-code" else host.upper().replace("-", "_")) + "_"
+    keys = (prefix + "BASE_URL", prefix + "SERVER_URL", prefix + "ENDPOINT", "POWERCONTEXT_CLIENT_SERVER_URL")
     if host == "claude-code":
         keys += ("CLAUDE_PLUGIN_OPTION_SERVER_URL",)
     for key in keys:
@@ -202,34 +154,16 @@ def _explicit_setup_endpoint(host: str, server_url: str) -> str:
     return endpoint
 
 
-def _saved_setup_endpoints(host: str, native_endpoint: str | None) -> list[tuple[str, str]]:
-    """Read saved endpoint fallbacks, using the supplied native URL for DSH."""
-    if host == "minimax":
-        return [("native MiniMax settings", native_endpoint)] if native_endpoint else []
-    saved = load_client_settings(host).get("server_url")
-    native = native_endpoint if host == "dsh" else existing_native_endpoint(host)
-    return [
-        (name, normalize_client_url(value).removesuffix("/mcp").rstrip("/"))
-        for name, value in (("saved client settings", saved), ("native host settings", native))
-        if value
-    ]
-
-
-def resolve_setup_endpoint(
-    host: str,
-    *,
-    server_url: str | None = None,
-    default: str = "http://127.0.0.1:8000",
-    native_endpoint: str | None = None,
-) -> str:
+def resolve_setup_endpoint(host: str, *, server_url: str | None = None, default: str = "http://127.0.0.1:8000") -> str:
     """Choose one endpoint, rejecting ambiguous explicit settings before installation.
 
-    New URL declarations supersede saved installation settings but must agree with
-    active runtime overrides. Saved endpoints and the local port are fallbacks.
+    A command-line URL is an explicit choice. Otherwise URL declarations must agree;
+    the local listening port is only a fallback when no client endpoint exists.
     """
     if server_url is not None:
         return _explicit_setup_endpoint(host, server_url)
-    keys = _setup_endpoint_environment_names(host)
+    prefix = "POWERCONTEXT_" + ("CLAUDE" if host == "claude-code" else host.upper().replace("-", "_")) + "_"
+    keys = (prefix + "BASE_URL", prefix + "SERVER_URL", prefix + "ENDPOINT", "POWERCONTEXT_CLIENT_SERVER_URL")
     loaded = setup_environment()
     candidates = [
         (name, normalize_client_url(values[name]).removesuffix("/mcp").rstrip("/"))
@@ -237,8 +171,11 @@ def resolve_setup_endpoint(
         for name in keys
         if values.get(name)
     ]
-    if not candidates:
-        candidates = _saved_setup_endpoints(host, native_endpoint)
+    saved = load_client_settings(host).get("server_url")
+    native = existing_native_endpoint(host)
+    for name, value in (("saved client settings", saved), ("native host settings", native)):
+        if value:
+            candidates.append((name, normalize_client_url(value).removesuffix("/mcp").rstrip("/")))
     if len({value for _, value in candidates}) > 1:
         names = ", ".join(dict.fromkeys(name for name, _ in candidates))
         raise ValueError(  # noqa: TRY003
@@ -250,17 +187,15 @@ def resolve_setup_endpoint(
     values = loaded | dict(os.environ)
     if public_url := values.get("POWERCONTEXT_SERVER_PUBLIC_URL"):
         return normalize_client_url(public_url).removesuffix("/mcp").rstrip("/")
-    from powercontext.server.configuration import resolve_http_configuration
-
-    listener = resolve_http_configuration(loaded, os.environ)
-    if listener.uds is not None:
-        raise ValueError(  # noqa: TRY003
-            "The configured Server uses UDS and has no TCP endpoint. "
-            "Set --server-url or POWERCONTEXT_SERVER_PUBLIC_URL to an HTTP(S) proxy endpoint for Agent setup."
-        )
-    if "port" not in listener.model_fields_set:
+    if "POWERCONTEXT_SERVER_HTTP_PORT" not in values:
         return default
-    return f"http://127.0.0.1:{listener.port}"
+    try:
+        port = int(values["POWERCONTEXT_SERVER_HTTP_PORT"])
+    except ValueError:
+        port = 0
+    if not 1 <= port <= 65535:
+        raise ValueError("POWERCONTEXT_SERVER_HTTP_PORT must be an integer between 1 and 65535")  # noqa: TRY003
+    return f"http://127.0.0.1:{port}"
 
 
 def existing_native_endpoint(host: str) -> str | None:
@@ -284,34 +219,86 @@ def existing_native_endpoint(host: str) -> str | None:
     return None
 
 
-def configure_connection(
-    settings: SetupTransport, *, dsh_target: DshTarget | None = None, writes: dict[Path, bytes] | None = None
-) -> SetupAuthorizationStatus:
-    """Publish the native endpoint, shared settings, and credentials as one connection."""
-    from powercontext.cli.authorization import authorization_updates
-    from powercontext.cli.installation import publish
+def save_setup_transport(settings: SetupTransport) -> None:
+    """Save endpoint-bound consent, rolling back paired native writes on failure."""
 
-    credentials, state = authorization_updates(settings)
-    publish(writes={**(writes or {}), **setup_transport_updates(settings, dsh_target=dsh_target), **credentials})
-    return state
-
-
-def setup_transport_updates(settings: SetupTransport, *, dsh_target: DshTarget | None = None) -> dict[Path, bytes]:
-    """Prepare the shared nonsecret Client settings for publication."""
-    from powercontext.cli.system import SetupError
+    from powercontext.cli.system import SetupError, _write_bytes_atomically
 
     path = client_config_file()
+    completed: list[tuple[Path, bytes | None]] = []
     try:
         config: Any = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"version": 1, "hosts": {}}
         if not isinstance(config, dict) or config.get("version") != 1 or not isinstance(config.get("hosts"), dict):
-            raise ValueError  # noqa: TRY301 - normalize invalid persisted configuration.
+            raise ValueError("Client configuration must have version 1 and a hosts object")  # noqa: TRY003, TRY301
         entry = config["hosts"].setdefault(settings.host, {})
         if not isinstance(entry, dict):
-            raise ValueError  # noqa: TRY301, TRY004 - normalize invalid persisted configuration.
+            raise ValueError("Client host configuration must be an object")  # noqa: TRY003, TRY004, TRY301
         entry.update(server_url=settings.server_url, allow_insecure_http=settings.allow_insecure_http)
-        if dsh_target is not None:
-            entry.update(profile=dsh_target.profile, dsh_command=dsh_target.command)
-        updates: dict[Path, bytes] = {path: (json.dumps(config, ensure_ascii=False, indent=2) + "\n").encode()}
+        updates: list[tuple[Path, dict[str, Any]]] = []
+        if settings.host == "hermes":
+            native_path = hermes_config_file()
+            native = json.loads(native_path.read_text(encoding="utf-8")) if native_path.exists() else {}
+            if not isinstance(native, dict):
+                raise ValueError("Hermes client configuration must be an object")  # noqa: TRY003, TRY301
+            native.update(base_url=settings.server_url, allow_insecure_http=settings.allow_insecure_http)
+            updates.append((native_path, native))
+        updates.append((path, config))
+        # Validate every destination before writing either half of a native/shared pair.
+        writes = [
+            (destination, destination.read_bytes() if destination.exists() else None, payload)
+            for destination, payload in updates
+        ]
+        for destination, snapshot, payload in writes:
+            _write_bytes_atomically(destination, (json.dumps(payload, indent=2) + "\n").encode())
+            completed.append((destination, snapshot))
     except (OSError, ValueError) as error:
+        for destination, snapshot in reversed(completed):
+            try:
+                if snapshot is None:
+                    destination.unlink(missing_ok=True)
+                else:
+                    _write_bytes_atomically(destination, snapshot)
+            except OSError:
+                typer.echo(
+                    f"WARNING: could not restore {destination}; check its configuration before restarting.", err=True
+                )
         raise SetupError(f"Could not save PowerContext Client settings at {path}") from error  # noqa: TRY003
-    return updates
+
+
+def hermes_config_file() -> Path:
+    """Locate the same native configuration file used by the Hermes provider."""
+
+    override = os.environ.get("POWERCONTEXT_HERMES_CONFIG")
+    if override:
+        return Path(override)
+    return Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes"))) / "powercontext" / "config.json"
+
+
+def transport_diagnostic(host: str) -> Diagnostic:
+    """Report explicitly insecure transport as degraded rather than silently green."""
+
+    from powercontext.cli.native_transport import resolve_host_transport
+    from powercontext.cli.system import Diagnostic, DiagnosticStatus
+
+    try:
+        endpoint, allowed = resolve_host_transport(host)
+    except ValueError as error:
+        return Diagnostic(status=DiagnosticStatus.FAILED, detail=str(error))
+    if is_remote_http(endpoint):
+        return Diagnostic(
+            status=DiagnosticStatus.DEGRADED if allowed else DiagnosticStatus.FAILED,
+            detail=(
+                f"{endpoint}: insecure HTTP explicitly enabled; credentials and content are unencrypted"
+                if allowed
+                else f"{endpoint}: remote HTTP blocked; use HTTPS or explicitly allow insecure HTTP"
+            ),
+        )
+    return Diagnostic(status=DiagnosticStatus.OK, detail=endpoint)
+
+
+def add_transport_diagnostic(diagnostics: dict[str, Diagnostic], host: str) -> None:
+    """Append policy problems without changing healthy installation reports."""
+
+    diagnostic = transport_diagnostic(host)
+    if not diagnostic.ok:
+        diagnostics["transport"] = diagnostic

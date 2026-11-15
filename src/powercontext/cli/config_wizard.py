@@ -48,8 +48,8 @@ from powercontext.cli.config_wizard_seekdb import (
     start_seekdb_install,
 )
 from powercontext.cli.config_wizard_ui import WizardUI, choose_language
+from powercontext.cli.env_file import EnvironmentFileError, parse_environment
 from powercontext.client.settings import normalize_server_url
-from powercontext.env_file import EnvironmentFileError, parse_environment
 from powercontext.paths import default_database_path, default_seekdb_path, sqlite_url
 
 SERVER = "POWERCONTEXT_SERVER_"
@@ -115,7 +115,6 @@ def run_wizard(output: Path, *, language: str | None = None, advanced: bool = Fa
     """Collect answers and write files only after explicit final confirmation."""
 
     from powercontext.cli.config import ConfigError
-    from powercontext.server.configuration import has_uds_configuration
 
     output = output.expanduser().absolute()
     state: Wizard | None = None
@@ -123,12 +122,6 @@ def run_wizard(output: Path, *, language: str | None = None, advanced: bool = Fa
         _check_output(output)
         content = output.read_text(encoding="utf-8") if output.exists() else ""
         original = parse_environment(content, source=str(output))
-        if has_uds_configuration(original) or has_uds_configuration(original, os.environ):
-            raise WizardInputError(  # noqa: TRY003
-                "The wizard supports TCP listeners; edit UDS configuration directly in the environment file "
-                "and clear process UDS overrides before using the wizard. "
-                "/ 向导目前仅支持 TCP 监听；UDS 配置请直接编辑环境文件，并在使用向导前清除进程中的 UDS 配置。"
-            )
         match = re.search(r"(?m)^# powercontext-wizard-language=(en|zh)\s*$", content)
         chosen = choose_language(language, None if match is None else match.group(1))
         ui = WizardUI(chosen)
@@ -208,8 +201,6 @@ def _storage(state: Wizard) -> None:
         _existing_server(state)
         return
     state.patch({f"{SERVER}DATABASE_KIND": kind})
-    if kind != "seekdb":
-        state.patch({f"{SERVER}DATABASE_DATABASE": None})
     if kind == "sqlite":
         previous = state.values.get(f"{SERVER}DATABASE_URL")
         default_path = str(default_database_path())
@@ -251,21 +242,7 @@ def _storage(state: Wizard) -> None:
             .expanduser()
             .absolute()
         )
-        ui.say(
-            "The default database is powercontext. Existing seekdb users: enter test to retain old data.",
-            "默认数据库为 powercontext。已有 seekdb 用户：输入 test 以继续使用旧数据。",
-        )
-        database = ui.ask(
-            "Database name",
-            "数据库名称",
-            default=state.values.get(f"{SERVER}DATABASE_DATABASE", "powercontext"),
-            required=True,
-        )
-        state.patch({
-            f"{SERVER}DATABASE_PATH": str(path),
-            f"{SERVER}DATABASE_DATABASE": database,
-            f"{SERVER}DATABASE_URL": None,
-        })
+        state.patch({f"{SERVER}DATABASE_PATH": str(path), f"{SERVER}DATABASE_URL": None})
         _prepare_seekdb_dependency(state)
     else:
         previous = state.values.get(f"{SERVER}DATABASE_URL", "")
@@ -599,8 +576,8 @@ def _network(state: Wizard) -> None:
     ui = state.ui
     ui.section("4. Dashboard and access", "4. Dashboard 与访问")
     dashboard = ui.confirm(
-        "Enable the browser Dashboard?",
-        "开启浏览器 Dashboard？",
+        "Enable the browser Dashboard? This also enables authenticated access and creates or retains a Server token.",
+        "开启浏览器 Dashboard？这会同时启用访问认证，并生成或沿用 Server Token。",
         default=state.values.get(f"{SERVER}DASHBOARD_ENABLED", "false") == "true",
     )
     ui.say(
@@ -645,13 +622,9 @@ def _network(state: Wizard) -> None:
         else:
             host, port, address = _custom_access(state, port)
     token = state.values.get(f"{SERVER}AUTH_TOKEN", "")
-    authenticated = state.scenario != "local" or bool(token) or state.values.get(f"{SERVER}ACCESS_MODE") == "enforced"
-    if dashboard and not authenticated:
-        authenticated = ui.confirm(
-            "Require authentication for Dashboard, HTTP API, and MCP?",
-            "为 Dashboard、HTTP API 和 MCP 启用访问认证？",
-            default=False,
-        )
+    authenticated = (
+        dashboard or state.scenario != "local" or bool(token) or state.values.get(f"{SERVER}ACCESS_MODE") == "enforced"
+    )
     if authenticated and not token:
         token = secrets.token_urlsafe(32)
         state.generated_auth_token = token

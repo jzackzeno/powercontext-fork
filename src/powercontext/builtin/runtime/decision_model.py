@@ -35,7 +35,6 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, m
 
 from powercontext._logging import log_safely
 from powercontext.builtin.inference import InferenceError, InferenceUsage, StructuredGenerator
-from powercontext.builtin.inference.errors import InferencePrivacyError
 
 logger = logging.getLogger(__name__)
 
@@ -145,19 +144,8 @@ class LLMDecisionModel:
 
     policy_id = DECISION_INSTRUCTIONS_VERSION
 
-    def __init__(
-        self,
-        generator: StructuredGenerator[DecisionInput, DecisionOutput],
-        /,
-        *,
-        is_local_only: bool = False,
-        provider_id: str | None = None,
-        backend_model_id: str | None = None,
-    ) -> None:
+    def __init__(self, generator: StructuredGenerator[DecisionInput, DecisionOutput], /) -> None:
         self._generator = generator
-        self.is_local_only = is_local_only
-        self.provider_id = provider_id
-        self.backend_model_id = backend_model_id
 
     async def evaluate(self, request: DecisionRequest, /) -> DecisionResult:
         """Map the model's validated answer onto one portable result."""
@@ -189,9 +177,6 @@ class FailOpenDecisionModel:
     def __init__(self, delegate: DecisionModel, /, *, timeout_seconds: float | None = None) -> None:
         self._delegate = delegate
         self.policy_id = delegate.policy_id
-        self.is_local_only = bool(getattr(delegate, "is_local_only", False))
-        self.provider_id = getattr(delegate, "provider_id", None)
-        self.backend_model_id = getattr(delegate, "backend_model_id", None)
         self._timeout_seconds = timeout_seconds
 
     async def evaluate(self, request: DecisionRequest, /) -> DecisionResult:
@@ -203,9 +188,6 @@ class FailOpenDecisionModel:
             async with asyncio.timeout(self._timeout_seconds):
                 return await self._delegate.evaluate(request)
         except asyncio.CancelledError:
-            raise
-        except InferencePrivacyError:
-            # A mandatory send/release refusal is not a discretionary judgment.
             raise
         except Exception:
             log_safely(
@@ -322,8 +304,6 @@ class StructuredDecisionModel:
     async def evaluate(self, request: DecisionModelRequest, /) -> DecisionModelResult:
         try:
             result = await self._generator.generate(request)
-        except InferencePrivacyError:
-            raise
         except InferenceError as error:
             return DecisionModelResult(used_fallback=True, fallback_reason=type(error).__name__)
         output = result.output.model_copy(update={"usage": result.usage})

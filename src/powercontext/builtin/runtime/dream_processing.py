@@ -25,8 +25,8 @@ from powercontext.builtin.runtime.processing_contracts import ArtifactProcessing
 from powercontext.builtin.runtime.processing_execution import ScopeInvocation
 
 if TYPE_CHECKING:
-    from powercontext.builtin.authz.worker import WorkerSecurity
     from powercontext.builtin.runtime.relational import RelationalContexts
+    from powercontext.server.processing_security import WorkerSecurity
 
 
 async def process_dream_invocation(
@@ -39,9 +39,9 @@ async def process_dream_invocation(
 ) -> bool:
     access = None
     if security is not None:
-        from powercontext.builtin.authz.dream import DreamAuthorization
+        from powercontext.server.dream_access import DreamAccess
 
-        access = DreamAuthorization(security.access)
+        access = DreamAccess(security.access)
     service = contexts.dream(
         generator,
         budget=config.runtime.dream_budget,

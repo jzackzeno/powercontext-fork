@@ -17,75 +17,48 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import datetime
-from enum import StrEnum
-from hashlib import sha256
 from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
 
 from powercontext.artifacts import ArtifactRef
-from powercontext.artifacts.models import _reject_legacy_memory_citations
-from powercontext.builtin.artifacts.atomic_memory.models import AtomicMemoryContent
 from powercontext.builtin.artifacts.experience import ExperienceContent
-from powercontext.builtin.artifacts.handoff.models import HandoffContent
 from powercontext.builtin.artifacts.memory.models import (
+    MemoryCitation,
     MemoryEntryInput,
+    MemoryEntryState,
+    MemoryEntryVersion,
     MemoryHit,
     MemoryRerankTrace,
+    MemoryRevisionChanges,
     MemorySearchMode,
     MemoryUsedSearchMode,
 )
 from powercontext.builtin.artifacts.profile.models import ProfileCandidateProposal, ProfileWriteContent
-from powercontext.builtin.artifacts.prompt import PromptCapability, PromptContent
+from powercontext.builtin.artifacts.prompt import PromptCapability
 from powercontext.builtin.artifacts.skill import (
     ExternalSkillProviderScan,
     ExternalSkillResolution,
     SkillContent,
 )
-from powercontext.builtin.artifacts.topic_memory.models import TopicMemoryContent
-from powercontext.builtin.catalog_changes.models import CatalogChangeCandidate, CatalogChangeProposal
 from powercontext.builtin.review import (
     DEFAULT_CANDIDATE_PAGE_SIZE,
     MAX_CANDIDATE_EVIDENCE,
     MAX_CANDIDATE_PAGE_SIZE,
-    Candidate,
-    CandidatePage,
+    ArtifactCandidate,
+    ArtifactCandidatePage,
     CandidateStatus,
 )
 from powercontext.builtin.review.generation import SkillGenerationOrigin
-from powercontext.builtin.runtime.receipt import PreparedContextReceipt
 from powercontext.builtin.sources import ExternalSkillImportMode
 from powercontext.builtin.tags import TagFilter
 from powercontext.sources import ConnectorBinding, SourceObservation, SourceRef
 
 PreparedContextSchema: TypeAlias = Literal["powercontext.prepared-context.v1"]
 PreparedContextStatus: TypeAlias = Literal["ready", "empty"]
-PreparedContextReason: TypeAlias = Literal["inference_timeout", "inference_unavailable"]
-ReviewedProposal: TypeAlias = (
-    ExperienceContent
-    | SkillContent
-    | ProfileCandidateProposal
-    | AtomicMemoryContent
-    | TopicMemoryContent
-    | HandoffContent
-    | PromptContent
-)
-BootstrapContextSchema: TypeAlias = Literal["powercontext.bootstrap-context.v1"]
-BootstrapContextProfile: TypeAlias = Literal["powercontext.scope-bootstrap.v1"]
-BootstrapContextLifecycle: TypeAlias = Literal["startup", "resume", "clear", "compact", "restore", "fork"]
-BootstrapContextStatus: TypeAlias = Literal["ready", "empty", "skipped"]
-BootstrapReceiptState: TypeAlias = Literal["pending", "injected", "skipped", "failed"]
-BootstrapSkipReason: TypeAlias = Literal[
-    "disabled",
-    "no_eligible_context",
-    "already_delivered",
-    "preparation_failed",
-]
+ReviewedProposal: TypeAlias = ExperienceContent | SkillContent | ProfileCandidateProposal
 
 PREPARED_CONTEXT_SCHEMA: PreparedContextSchema = "powercontext.prepared-context.v1"
-BOOTSTRAP_CONTEXT_SCHEMA: BootstrapContextSchema = "powercontext.bootstrap-context.v1"
-BOOTSTRAP_CONTEXT_PROFILE: BootstrapContextProfile = "powercontext.scope-bootstrap.v1"
 
 
 class _PreparedContextModel(BaseModel):
@@ -98,27 +71,6 @@ class CaptureSource(BaseModel):
     source_id: str
     content: str
     metadata: Mapping[str, JsonValue]
-
-
-class WorkingNoteKind(StrEnum):
-    """Classify one bounded kind of session-local work state."""
-
-    INSPECTION = "inspection"
-    ABANDONED_APPROACH = "abandoned_approach"
-    VALIDATION = "validation"
-    UNRESOLVED = "unresolved"
-    HOST_CONTEXT = "host_context"
-
-
-class CaptureWorkingNote(BaseModel):
-    """Explicitly capture short-lived, non-Memory work state."""
-
-    source_id: str
-    content: str
-    session_id: str
-    note_kind: WorkingNoteKind
-    expires_at: datetime | None = None
-    metadata: Mapping[str, JsonValue] = Field(default_factory=dict)
 
 
 class SourceReceipt(BaseModel):
@@ -150,52 +102,6 @@ class CommitConnectorCheckpoint(BaseModel):
     checkpoint: JsonValue | None
 
 
-class DreamOperationCapability(BaseModel):
-    operation: str
-    output_kind: Literal["candidate", "tag_candidate"] = "candidate"
-    effect: Literal[
-        "review_then_publish",
-        "review_then_publish_configuration",
-        "review_then_replace_tags",
-    ] = "review_then_publish"
-
-
-class ExtractionBackground(BaseModel):
-    """Placement, leadership, and lifecycle of the Memory Supervisor."""
-
-    location: Literal["local", "external", "none"]
-    role: Literal["leader", "standby"] | None = None
-    state: Literal["running", "degraded", "stopped", "unknown"]
-    automatic_processing_enabled: bool | None = None
-
-
-class ExtractionFailure(BaseModel):
-    """A historical failure observation, not an unresolved incident."""
-
-    model_config = ConfigDict(frozen=True)
-
-    code: str
-    stage: Literal["inference", "flush", "worker", "supervisor", "lease_renewal", "scope_discovery"]
-    occurred_at: datetime
-
-
-class ExtractionObservation(BaseModel):
-    """Independent success and failure evidence within this Runtime's lifetime."""
-
-    status: Literal["unverified", "observed"]
-    since: datetime
-    last_success_at: datetime | None = None
-    last_failure: ExtractionFailure | None = None
-
-
-class ExtractionStatus(BaseModel):
-    """Read-only facts about Memory extraction, without an overall health verdict."""
-
-    configuration: Literal["configured", "unconfigured", "unknown"]
-    background: ExtractionBackground
-    observation: ExtractionObservation
-
-
 class RuntimeCapabilities(BaseModel):
     """Behavior available from the assembled Source-to-Memory Runtime."""
 
@@ -203,22 +109,18 @@ class RuntimeCapabilities(BaseModel):
     experience_generation: bool = False
     managed_skill_generation: bool = False
     artifact_dreaming: bool = False
-    artifact_dreaming_operations: tuple[DreamOperationCapability, ...] = ()
     external_skill_registry: bool = False
     memory_search_modes: tuple[MemorySearchMode, ...]
     handoff_generation: bool = False
     prompts: dict[str, PromptCapability] = Field(default_factory=dict)
     context_versions: tuple[PreparedContextSchema, ...] = (PREPARED_CONTEXT_SCHEMA,)
-    context_reuse_versions: tuple[str, ...] = ("powercontext.context-reuse.v1",)
-    context_reuse_families: tuple[str, ...] = ("atomic-memory",)
 
 
 class MemoryFlushResult(BaseModel):
     """Result of processing one scoped Source window.
 
-    ``held_count`` and ``hold_codes`` report a write-gate ``HOLD``. A held window commits nothing,
-    yet it still advances the cursor past its Sources, so those Sources are consumed rather than
-    retried; ``held_count`` is 0 or 1 and ``hold_codes`` carries the gate rejection codes.
+    ``held_count`` and ``hold_codes`` expose a gate refusal to the caller: a held window
+    advances its cursor but writes no Memory, and the structured code says why.
     """
 
     previous_cursor: int
@@ -226,7 +128,6 @@ class MemoryFlushResult(BaseModel):
     current_cursor: int
     source_count: int
     memory_ref: ArtifactRef | None
-    remaining_work: bool = False
     held_count: int = 0
     hold_codes: tuple[str, ...] = ()
 
@@ -294,39 +195,16 @@ class MemorySearchPage(BaseModel):
     rerank: MemoryRerankTrace | None = None
 
 
-BUILTIN_CONTEXT_FAMILIES = frozenset({"memory", "experience", "profile", "topic-memory"})
-
-
-class ContextPluginHit(_PreparedContextModel):
-    """One passage a plugin's search returned for an exact revision of its family."""
-
-    artifact: ArtifactRef
-    text: str
-
-
 class ContextAssemblySection(_PreparedContextModel):
-    """One selected Artifact family and its maximum output count.
+    """One selected Artifact family and its maximum output count."""
 
-    A plugin family takes its entries from ``hits``, which the Server fills from the
-    plugin's ``search_artifacts`` before assembly; ``search`` carries the caller's
-    search fields for that plugin and is rejected for built-in families. The Server sets
-    ``search_failed`` when the plugin was unavailable, so the section stays empty.
-    """
-
-    family: Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9-]*$")]
+    family: Literal["memory", "experience", "profile", "topic-memory"]
     limit: Annotated[int, Field(ge=1, le=8)]
-    search: dict[str, JsonValue] | None = None
-    hits: tuple[ContextPluginHit, ...] = ()
-    search_failed: bool = False
 
     @model_validator(mode="after")
     def validate_limit(self) -> ContextAssemblySection:
         if self.family == "experience" and self.limit > 2:
             raise ValueError("Experience sections cannot include more than two entries")  # noqa: TRY003
-        if self.family in BUILTIN_CONTEXT_FAMILIES and (self.search is not None or self.hits or self.search_failed):
-            raise ValueError("search applies only to plugin families")  # noqa: TRY003
-        if any(hit.artifact.family != self.family for hit in self.hits):
-            raise ValueError("hits must belong to the section family")  # noqa: TRY003
         return self
 
 
@@ -355,19 +233,13 @@ class PrepareContextRequest(_PreparedContextModel):
     query: Annotated[str, Field(min_length=1, max_length=8192)]
     max_bytes: Annotated[int, Field(ge=512, le=32768)] = 8000
     assembly: ContextAssembly | None = None
-    bootstrap_receipt_id: Annotated[str, Field(min_length=1, max_length=64)] | None = None
     include_code: bool = Field(default=False, strict=True)
-    include_reuse: bool = Field(default=False, strict=True)
-    include_receipt: bool = Field(default=False, strict=True)
 
     @model_validator(mode="before")
     @classmethod
     def reject_null_assembly(cls, value: Any) -> Any:
-        if isinstance(value, Mapping):
-            if "assembly" in value and value["assembly"] is None:
-                raise ValueError("assembly must be omitted or contain an object")  # noqa: TRY003
-            if value.get("include_receipt", False) is None:
-                return {**value, "include_receipt": False}
+        if isinstance(value, Mapping) and "assembly" in value and value["assembly"] is None:
+            raise ValueError("assembly must be omitted or contain an object")  # noqa: TRY003
         return value
 
     @field_validator("query")
@@ -375,13 +247,6 @@ class PrepareContextRequest(_PreparedContextModel):
     def validate_query(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("query must contain non-whitespace content")  # noqa: TRY003
-        return value
-
-    @field_validator("bootstrap_receipt_id")
-    @classmethod
-    def validate_bootstrap_receipt_id(cls, value: str | None) -> str | None:
-        if value is not None and not all("\x21" <= character <= "\x7e" for character in value):
-            raise ValueError("bootstrap_receipt_id must contain only visible ASCII")  # noqa: TRY003
         return value
 
 
@@ -392,7 +257,6 @@ class PreparedContext(_PreparedContextModel):
     status: PreparedContextStatus
     content: str | None
     content_bytes: Annotated[int, Field(ge=0)]
-    receipt: PreparedContextReceipt | None = None
 
     @model_validator(mode="after")
     def validate_content(self) -> PreparedContext:
@@ -407,174 +271,69 @@ class PreparedContext(_PreparedContextModel):
         return self
 
 
-class ContextReuseConstraints(_PreparedContextModel):
-    """Conditions for preserving one prepared value, independent of provider KV settings."""
+class MemoryEntryRecord(BaseModel):
+    """An exact entry version together with its state in one Revision."""
 
-    preserve: tuple[Literal["content", "citations", "trust", "order"], ...] = (
-        "content",
-        "citations",
-        "trust",
-        "order",
-    )
-    refresh_on: tuple[Literal["permission_change", "source_ineligible", "context_boundary"], ...] = (
-        "permission_change",
-        "source_ineligible",
-        "context_boundary",
-    )
+    memory_ref: ArtifactRef
+    state: MemoryEntryState
+    entry: MemoryEntryVersion
 
-
-class ContextReuse(_PreparedContextModel):
-    """Short-lived authenticated private provenance for an exact prepared value."""
-
-    schema_version: Literal["powercontext.context-reuse.v1"] = Field(
-        default="powercontext.context-reuse.v1",
-        alias="schema",
-    )
-    constraints: ContextReuseConstraints = Field(default_factory=ContextReuseConstraints)
-    expires_at: datetime
-    binding: Annotated[str, Field(min_length=1, max_length=65536)]
+    @property
+    def citation(self) -> MemoryCitation:
+        return MemoryCitation(
+            memory_ref=self.memory_ref,
+            entry_id=self.entry.entry_id,
+            entry_version_id=self.entry.entry_version_id,
+        )
 
 
-class PreparedContextWithReuse(_PreparedContextModel):
-    """Explicit opt-in envelope; the normal preparation shape remains unchanged."""
+class MemoryEntriesPage(BaseModel):
+    """Selected current-head entries for one scope, or an absent Memory."""
 
-    schema_version: Literal["powercontext.prepared-context-with-reuse.v1"] = Field(
-        default="powercontext.prepared-context-with-reuse.v1",
-        alias="schema",
-    )
-    context: PreparedContext
-    reuse: ContextReuse
+    memory_ref: ArtifactRef | None
+    entries: tuple[MemoryEntryRecord, ...] = ()
 
 
-PrepareContextResult: TypeAlias = PreparedContext | PreparedContextWithReuse
+class GetMemoryEntryRequest(BaseModel):
+    citation: MemoryCitation
 
 
-class BootstrapContextRequest(_PreparedContextModel):
-    """Prepare curated context for one host lifecycle boundary without a fake query."""
-
-    enabled: bool = False
-    profile: BootstrapContextProfile = BOOTSTRAP_CONTEXT_PROFILE
-    lifecycle: BootstrapContextLifecycle
-    integration: Annotated[str, Field(min_length=1, max_length=64)]
-    event_id: Annotated[str, Field(min_length=1, max_length=512)] | None = None
-    max_bytes: Annotated[int, Field(ge=512, le=8192)] = 4096
-    handoff: ArtifactRef | None = None
-
-    @field_validator("integration")
-    @classmethod
-    def validate_integration(cls, value: str) -> str:
-        if not all("\x21" <= character <= "\x7e" for character in value):
-            raise ValueError("integration must contain only visible ASCII")  # noqa: TRY003
-        return value
-
-    @field_validator("event_id")
-    @classmethod
-    def validate_event_id(cls, value: str | None) -> str | None:
-        if value is not None and not all("\x20" <= character <= "\x7e" for character in value):
-            raise ValueError("event_id must contain only printable ASCII")  # noqa: TRY003
-        return value
-
-    @field_validator("handoff")
-    @classmethod
-    def validate_handoff(cls, value: ArtifactRef | None) -> ArtifactRef | None:
-        if value is not None and value.family != "handoff":
-            raise ValueError("bootstrap handoff must use the handoff family")  # noqa: TRY003
-        return value
+class ReviseMemoryEntryRequest(BaseModel):
+    citation: MemoryCitation
+    kind: str
+    text: str
+    reason: str | None = None
 
 
-class BootstrapContextItem(_PreparedContextModel):
-    """One delivered item pinned to exact authoritative content."""
-
-    kind: Literal["atomic-memory", "handoff"]
-    scope_id: Annotated[str, Field(min_length=1, max_length=256)]
-    artifact: ArtifactRef
-    content_digest: Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
-    truncated: bool = False
-
-    @model_validator(mode="after")
-    def validate_reference(self) -> BootstrapContextItem:
-        if self.artifact.family != self.kind:
-            raise ValueError("bootstrap item kind must match its Artifact family")  # noqa: TRY003
-        return self
+class RetireMemoryEntryRequest(BaseModel):
+    citation: MemoryCitation
+    reason: str | None = None
 
 
-class BootstrapDeliveryReceipt(_PreparedContextModel):
-    """Content-free durable delivery state exposed to a host integration."""
-
-    receipt_id: Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[\x21-\x7E]+$")]
-    state: BootstrapReceiptState
-
-
-class BootstrapContext(_PreparedContextModel):
-    """A final bounded bootstrap package or a normal non-delivery result."""
-
-    schema_version: BootstrapContextSchema = Field(default=BOOTSTRAP_CONTEXT_SCHEMA, alias="schema")
-    status: BootstrapContextStatus
-    reason: BootstrapSkipReason | None = None
-    profile: BootstrapContextProfile = BOOTSTRAP_CONTEXT_PROFILE
-    content: str | None
-    content_bytes: Annotated[int, Field(ge=0)]
-    package_digest: Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")] | None = None
-    items: Annotated[tuple[BootstrapContextItem, ...], Field(max_length=7, strict=False)] = ()
-    truncated: bool = False
-    receipt: BootstrapDeliveryReceipt
-
-    @model_validator(mode="after")
-    def validate_result(self) -> BootstrapContext:
-        if self.status == "ready":
-            if (
-                self.reason is not None
-                or self.receipt.state != "pending"
-                or self.content is None
-                or not self.content.strip()
-                or self.package_digest is None
-                or not self.items
-                or len(self.content.encode("utf-8")) != self.content_bytes
-                or self.package_digest != f"sha256:{sha256(self.content.encode('utf-8')).hexdigest()}"
-            ):
-                raise ValueError("ready bootstrap context is incomplete")  # noqa: TRY003
-            return self
-        if self.content is not None or self.content_bytes != 0 or self.package_digest is not None or self.items:
-            raise ValueError("non-ready bootstrap context must not contain package data")  # noqa: TRY003
-        if self.status == "empty" and self.reason != "no_eligible_context":
-            raise ValueError("empty bootstrap context requires the no-content reason")  # noqa: TRY003
-        if self.status == "empty" and self.receipt.state != "skipped":
-            raise ValueError("empty bootstrap context requires a skipped receipt")  # noqa: TRY003
-        if self.status == "skipped" and self.reason is None:
-            raise ValueError("skipped bootstrap context requires a reason")  # noqa: TRY003
-        if self.status == "skipped" and (
-            self.reason == "no_eligible_context"
-            or (self.reason == "disabled" and self.receipt.state != "skipped")
-            or (self.reason == "preparation_failed" and self.receipt.state != "failed")
-            or (self.reason == "already_delivered" and self.receipt.state == "pending")
-        ):
-            raise ValueError("skipped bootstrap context has an inconsistent receipt")  # noqa: TRY003
-        return self
+class MemoryMutationResult(BaseModel):
+    previous_revision: int | None
+    memory_ref: ArtifactRef
+    entry: MemoryEntryRecord | None = None
 
 
-class RecordBootstrapDeliveryRequest(_PreparedContextModel):
-    """Finalize one pending delivery receipt without accepting content or error text."""
-
-    receipt_id: Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[\x21-\x7E]+$")]
-    outcome: Literal["injected", "failed"]
+class MemoryChangesPage(BaseModel):
+    memory_ref: ArtifactRef | None
+    revisions: tuple[MemoryRevisionChanges, ...] = ()
 
 
 class ProposeExperienceRequest(BaseModel):
     """Submit a complete Experience proposal with exact evidence."""
 
-    _reject_legacy_citations = model_validator(mode="before")(_reject_legacy_memory_citations)
-
     proposal: ExperienceContent
     sources: tuple[SourceRef, ...] = ()
     artifacts: tuple[ArtifactRef, ...] = ()
+    memory_citations: tuple[MemoryCitation, ...] = ()
     target: ArtifactRef | None = None
     reason: str | None = None
 
 
 class GenerateExperienceRequest(BaseModel):
     """Generate a reviewed Experience Candidate from exact evidence."""
-
-    _reject_legacy_citations = model_validator(mode="before")(_reject_legacy_memory_citations)
 
     sources: tuple[SourceRef, ...] = Field(default=(), max_length=MAX_CANDIDATE_EVIDENCE)
     artifacts: tuple[ArtifactRef, ...] = Field(default=(), max_length=MAX_CANDIDATE_EVIDENCE)
@@ -597,8 +356,6 @@ class GetExperienceRequest(BaseModel):
 class ProposeSkillRequest(BaseModel):
     """Submit a complete managed Skill proposal with exact evidence."""
 
-    _reject_legacy_citations = model_validator(mode="before")(_reject_legacy_memory_citations)
-
     proposal: SkillContent
     sources: tuple[SourceRef, ...] = ()
     artifacts: tuple[ArtifactRef, ...] = ()
@@ -608,8 +365,6 @@ class ProposeSkillRequest(BaseModel):
 
 class GenerateSkillRequest(BaseModel):
     """Generate a reviewed managed Skill Candidate from an explicit lineage shape."""
-
-    _reject_legacy_citations = model_validator(mode="before")(_reject_legacy_memory_citations)
 
     origin: SkillGenerationOrigin
     sources: tuple[SourceRef, ...] = Field(default=(), max_length=MAX_CANDIDATE_EVIDENCE)
@@ -654,57 +409,39 @@ ExternalSkillScanResult = ExternalSkillProviderScan
 ExternalSkillList = tuple[ExternalSkillResolution, ...]
 
 
-class ListCandidatesRequest(BaseModel):
+class ListArtifactCandidatesRequest(BaseModel):
     """Filter and page the current Review Inbox."""
 
-    candidate_kind: Literal["artifact", "tag"] | None = None
     status: CandidateStatus = CandidateStatus.PENDING
-    family: Literal["experience", "skill", "profile", "atomic-memory", "topic-memory", "handoff", "prompt"] | None = (
-        None
-    )
+    family: Literal["experience", "skill", "profile"] | None = None
     cursor: str | None = None
     limit: Annotated[int, Field(ge=1, le=MAX_CANDIDATE_PAGE_SIZE)] = DEFAULT_CANDIDATE_PAGE_SIZE
 
 
-class GetCandidateRequest(BaseModel):
+class GetArtifactCandidateRequest(BaseModel):
     candidate_id: str
 
 
-class ApproveCandidateRequest(BaseModel):
+class ApproveArtifactCandidateRequest(BaseModel):
     candidate_id: str
     expected_version: Annotated[int, Field(ge=1)]
 
 
-class RejectCandidateRequest(ApproveCandidateRequest):
+class RejectArtifactCandidateRequest(ApproveArtifactCandidateRequest):
     reason: Annotated[str, Field(min_length=1, max_length=2_000)]
 
 
-class ReviseCandidateRequest(ApproveCandidateRequest):
-    _reject_legacy_citations = model_validator(mode="before")(_reject_legacy_memory_citations)
-
-    proposal: (
-        CatalogChangeProposal
-        | ExperienceContent
-        | SkillContent
-        | ProfileWriteContent
-        | AtomicMemoryContent
-        | TopicMemoryContent
-        | HandoffContent
-        | PromptContent
-    )
-    sources: tuple[SourceRef, ...] | None = None
-    artifacts: tuple[ArtifactRef, ...] | None = None
-
+class ReviseArtifactCandidateRequest(ApproveArtifactCandidateRequest):
+    proposal: ExperienceContent | SkillContent | ProfileWriteContent
+    sources: tuple[SourceRef, ...] = ()
+    artifacts: tuple[ArtifactRef, ...] = ()
+    memory_citations: tuple[MemoryCitation, ...] | None = None
     target: ArtifactRef | None = None
     reason: str | None = None
 
 
-ExperienceCandidate = Candidate[ExperienceContent]
-ExperienceCandidatePage = CandidatePage[ExperienceContent]
-SkillCandidate = Candidate[SkillContent]
-ReviewedCandidate = Candidate[ReviewedProposal] | CatalogChangeCandidate
-
-
-class ReviewedCandidatePage(BaseModel):
-    candidates: tuple[ReviewedCandidate, ...]
-    next_cursor: str | None = None
+ExperienceCandidate = ArtifactCandidate[ExperienceContent]
+ExperienceCandidatePage = ArtifactCandidatePage[ExperienceContent]
+SkillCandidate = ArtifactCandidate[SkillContent]
+ReviewedCandidate = ArtifactCandidate[ReviewedProposal]
+ReviewedCandidatePage = ArtifactCandidatePage[ReviewedProposal]

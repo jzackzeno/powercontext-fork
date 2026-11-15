@@ -17,14 +17,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Protocol, runtime_checkable
+from typing import Protocol
 
-from powercontext.builtin.inference.observability import ProviderObservationReport
 from powercontext.builtin.persistence.supervision import ArtifactProcessingFence
-from powercontext.builtin.processing_diagnostics import ProcessingDiagnostics, processing_error_code
 
 
 class ArtifactProcessingWorkerOutcome(StrEnum):
@@ -34,23 +31,6 @@ class ArtifactProcessingWorkerOutcome(StrEnum):
     CURSOR_CONFLICT = "cursor_conflict"
     HEAD_CONFLICT = "head_conflict"
     LEADERSHIP_LOST = "leadership_lost"
-
-
-@dataclass(frozen=True, slots=True)
-class ArtifactProcessingModelUsageDelta:
-    """Bounded loss counters returned by one completed child Worker."""
-
-    dropped_records: int = 0
-    write_failures: int = 0
-
-    def __post_init__(self) -> None:
-        if (
-            type(self.dropped_records) is not int
-            or type(self.write_failures) is not int
-            or self.dropped_records < 0
-            or self.write_failures < 0
-        ):
-            raise ValueError("model usage delta counters must be nonnegative integers")  # noqa: TRY003
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,45 +46,13 @@ class ArtifactProcessingWorkAssignment:
 
 
 @dataclass(frozen=True, slots=True)
-class ArtifactProcessingBlock:
-    """A domain-owned durable rejection, independent of invocation generation.
-
-    Details contain operational counters only, never input or provider data.
-    The opaque key identifies the progress frontier within one ProcessingKey.
-    """
-
-    key: str
-    stage: str
-    error_code: str
-    details: tuple[tuple[str, int], ...] = ()
-
-
-class ArtifactProcessingBlockedError(RuntimeError):
-    """A Worker encountered a durable rejection after the admission check."""
-
-    def __init__(self, block: ArtifactProcessingBlock) -> None:
-        super().__init__(block.error_code)
-        self.block = block
-        self.stage = block.stage
-        self.error_code = block.error_code
-
-
-@dataclass(frozen=True, slots=True)
 class ArtifactProcessingWorkerFailure:
-    """Sanitized metadata safe to return across a child process boundary.
-
-    The child records cancellation independently of the diagnostic exception type.
-    """
+    """Sanitized metadata safe to return across a child process boundary."""
 
     stage: str
     error_code: str
     exception_type: str
     traceback: str
-    block: ArtifactProcessingBlock | None = None
-    cancelled: bool = False
-    model_usage: ArtifactProcessingModelUsageDelta | None = None
-    diagnostics: ProcessingDiagnostics | None = None
-    provider_observations: ProviderObservationReport | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,9 +62,6 @@ class ArtifactProcessingWorkerCompletion:
     outcome: ArtifactProcessingWorkerOutcome = ArtifactProcessingWorkerOutcome.SUCCEEDED
     held_count: int = 0
     hold_codes: tuple[str, ...] = ()
-    model_usage: ArtifactProcessingModelUsageDelta | None = None
-    noop: bool = False
-    provider_observations: ProviderObservationReport | None = None
 
 
 class ArtifactProcessingWorkerHandle(Protocol):
@@ -136,20 +81,7 @@ class ArtifactProcessingWorkerLauncher(Protocol):
 WorkerEntrypoint = Callable[[ArtifactProcessingWorkAssignment], ArtifactProcessingWorkerCompletion | None]
 
 
-@runtime_checkable
-class WorkerInitializerPreparation(Protocol):
-    """Own per-launch resources through spawn or cancellation cleanup.
-
-    The context yields a picklable callable that runs inside the new child.
-    """
-
-    def prepare(self) -> AbstractContextManager[Callable[[], None]]: ...
-
-
 __all__ = [
-    "ArtifactProcessingBlock",
-    "ArtifactProcessingBlockedError",
-    "ArtifactProcessingModelUsageDelta",
     "ArtifactProcessingWorkAssignment",
     "ArtifactProcessingWorkerCompletion",
     "ArtifactProcessingWorkerFailure",
@@ -157,6 +89,4 @@ __all__ = [
     "ArtifactProcessingWorkerLauncher",
     "ArtifactProcessingWorkerOutcome",
     "WorkerEntrypoint",
-    "WorkerInitializerPreparation",
-    "processing_error_code",
 ]

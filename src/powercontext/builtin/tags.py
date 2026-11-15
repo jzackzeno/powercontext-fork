@@ -21,34 +21,17 @@ from __future__ import annotations
 
 import unicodedata
 from hashlib import sha256
-from typing import Literal, get_args
+from typing import Annotated, Literal, get_args
 
 import rfc8785
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from powercontext.artifacts import ArtifactRef
-from powercontext.builtin.records import BaseAccessError, BaseArtifactFamily, InvalidBaseAccessRequestError
+from powercontext.builtin.records import ArtifactReadFamily, BaseAccessError, InvalidBaseAccessRequestError
 
-TaggableArtifactFamily = str
-
-
-def _taggable_families() -> tuple[str, ...]:
-    from powercontext.builtin.plugins.families import plugin_families
-
-    return (*get_args(BaseArtifactFamily), *sorted(plugin_families()))
-
-
-def _require_taggable(family: str) -> str:
-    """Accept built-in families and the plugin families loaded in this process."""
-
-    if family not in _taggable_families():
-        raise InvalidBaseAccessRequestError("family", "is not a taggable Artifact family")
-    return family
-
-
+TaggableArtifactFamily = ArtifactReadFamily
 TagMatch = Literal["all", "any"]
-TagTargetType = Literal["artifact"]
-MAX_TARGET_TAGS = 32
+TagTargetType = Literal["artifact", "memory_entry"]
 
 
 class _TagModel(BaseModel):
@@ -62,18 +45,20 @@ class ArtifactTagTarget(_TagModel):
     family: TaggableArtifactFamily
     artifact_id: str = Field(min_length=1, max_length=128)
 
-    @field_validator("family")
-    @classmethod
-    def validate_family(cls, value: str) -> str:
-        return _require_taggable(value)
+
+class MemoryEntryTagTarget(_TagModel):
+    """A logical entry in the current Memory manifest, including inactive entries."""
+
+    type: Literal["memory_entry"] = "memory_entry"
+    family: Literal["memory"] = "memory"
+    artifact_id: str = Field(min_length=1, max_length=128)
+    entry_id: str = Field(min_length=1, max_length=128)
 
 
-TagTarget = ArtifactTagTarget
+TagTarget = Annotated[ArtifactTagTarget | MemoryEntryTagTarget, Field(discriminator="type")]
 
 
-def normalize_tags(
-    tags: tuple[str, ...], *, maximum: int = MAX_TARGET_TAGS, allow_empty: bool = True
-) -> dict[str, str]:
+def normalize_tags(tags: tuple[str, ...], *, maximum: int = 32, allow_empty: bool = True) -> dict[str, str]:
     """Validate atomically and return display labels in UTF-8 key order.
 
     Invalid input is never included in an exception or diagnostic message.
@@ -141,27 +126,32 @@ class TagPreconditionError(BaseAccessError):
 class TagQuery(TagFilter):
     """A bounded exact query within one authorized Scope."""
 
-    families: tuple[TaggableArtifactFamily, ...] = Field(default_factory=_taggable_families)
-    target_types: tuple[TagTargetType, ...] = ("artifact",)
+    families: tuple[TaggableArtifactFamily, ...] = get_args(TaggableArtifactFamily)
+    target_types: tuple[TagTargetType, ...] = ("artifact", "memory_entry")
     include_inactive: bool = False
     limit: int = Field(default=50, ge=1, le=100)
     cursor: str | None = None
 
     @field_validator("families", "target_types")
     @classmethod
-    def validate_selection(cls, value: tuple[str, ...], info: ValidationInfo) -> tuple[str, ...]:
+    def validate_selection(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         if not value or len(set(value)) != len(value):
             raise InvalidBaseAccessRequestError("filters", "must contain distinct nonempty selections")
-        if info.field_name == "families":
-            for family in value:
-                _require_taggable(family)
         return value
+
+
+class TaggedMemoryCitation(_TagModel):
+    """The exact Memory citation accompanying a logical entry match."""
+
+    memory_ref: ArtifactRef
+    entry_id: str
+    entry_version_id: str
 
 
 class TaggedTarget(ArtifactTagSet):
     """A tag match pinned to the authoritative current content revision."""
 
-    reference: ArtifactRef
+    reference: ArtifactRef | TaggedMemoryCitation
 
 
 class TagQueryPage(_TagModel):

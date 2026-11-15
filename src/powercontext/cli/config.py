@@ -36,8 +36,8 @@ from urllib.parse import urlsplit
 import typer
 from pydantic import ValidationError
 
-from powercontext.env_file import EnvironmentFileError, parse_environment
-from powercontext.server.inference_notice import write_inference_capability_notice
+from powercontext.cli.env_file import EnvironmentFileError, parse_environment
+from powercontext.cli.inference_notice import write_inference_capability_notice
 
 if TYPE_CHECKING:
     from powercontext.server.settings import ServerSettings
@@ -132,7 +132,7 @@ API_PROTOCOLS = (
         credential_name="ANTHROPIC_API_KEY",
         base_url_name="ANTHROPIC_BASE_URL",
         default_base_url="https://api.anthropic.com",
-        default_generation_model="claude-sonnet-5-5",
+        default_generation_model="claude-sonnet-4-5",
         default_embedding_model=None,
     ),
 )
@@ -194,8 +194,6 @@ _BASE_ENVIRONMENT: dict[str, str] = {
     "POWERCONTEXT_SERVER_RUNTIME_MEMORY_EXTRACTION_PROFILE": "coding",
     "POWERCONTEXT_SERVER_INFERENCE_GENERATION_TIMEOUT_SECONDS": "30",
     "POWERCONTEXT_SERVER_INFERENCE_GENERATION_MAX_REQUESTS": "2",
-    "POWERCONTEXT_SERVER_INFERENCE_GENERATION_STREAMING": "disabled",
-    "POWERCONTEXT_SERVER_INFERENCE_GENERATION_STREAM_IDLE_TIMEOUT_SECONDS": "60",
     "POWERCONTEXT_SERVER_INFERENCE_EMBEDDING_NORMALIZATION": "unit",
     "POWERCONTEXT_SERVER_INFERENCE_EMBEDDING_BATCH_SIZE": "10",
     "POWERCONTEXT_SERVER_INFERENCE_EMBEDDING_TIMEOUT_SECONDS": "30",
@@ -276,85 +274,6 @@ class WizardLanguage(StrEnum):
     CHINESE = "zh"
 
 
-@app.command("agent")
-def configure_agents(
-    context: typer.Context,
-    agents: Annotated[list[str] | None, typer.Argument(help="Installed agents to configure.")] = None,
-    server_url: Annotated[str | None, typer.Option(help="Server URL for the selected agents.")] = None,
-    allow_insecure_http: Annotated[bool | None, typer.Option("--allow-insecure-http/--no-allow-insecure-http")] = None,
-    capture_prompts: Annotated[
-        bool | None,
-        typer.Option(
-            "--capture-prompts/--no-capture-prompts",
-            help="Claude Code, Kimi Code and ZCode only; omission preserves the capture preference.",
-        ),
-    ] = None,
-    scope_id: Annotated[str | None, typer.Option(help="Existing Scope ID for Kimi Code.")] = None,
-    workspace_scope: Annotated[
-        bool,
-        typer.Option("--workspace-scope", help="Kimi Code: resolve workspace bindings, then the Server default Scope."),
-    ] = False,
-    boundary_flush: Annotated[bool | None, typer.Option("--boundary-flush/--no-boundary-flush")] = None,
-    profile: Annotated[
-        str | None,
-        typer.Option(help="DSH profile or Kimi MCP profile: minimal, recommended, full; omission preserves it."),
-    ] = None,
-    dsh_command: Annotated[Path | None, typer.Option(help="DSH launcher path.")] = None,
-    env_file: Annotated[Path | None, typer.Option(help="Setup environment file; defaults to .env.")] = None,
-    json_output: Annotated[bool, typer.Option("--json")] = False,
-) -> None:
-    """Update existing agent connections without installing or activating plugins."""
-    from powercontext.cli.authorization import validate_setup_authorization
-    from powercontext.cli.dsh_runtime import DshProfile, resolve_dsh_target
-    from powercontext.cli.hosts import native_options, report_agents, select_hosts, validate_native_options
-    from powercontext.cli.installation import installers
-    from powercontext.cli.transport import prepare_setup_transport, setup_environment_file
-
-    token = setup_environment_file.set(env_file)
-    context.call_on_close(lambda: setup_environment_file.reset(token))
-    selected = select_hosts(agents, json_output=json_output)
-    validate_native_options(
-        selected,
-        capture_prompts=capture_prompts,
-        scope_id=scope_id,
-        workspace_scope=workspace_scope or None,
-        boundary_flush=boundary_flush,
-        profile=profile,
-        dsh_command=dsh_command,
-    )
-
-    def configure(host):
-        validate_setup_authorization(host)
-        options = native_options(
-            host,
-            capture_prompts=capture_prompts,
-            scope_id=scope_id,
-            workspace_scope=workspace_scope or None,
-            boundary_flush=boundary_flush,
-            profile=profile,
-        )
-        if host == "dsh":
-            options["dsh_target"] = resolve_dsh_target(
-                DshProfile(profile) if profile is not None else None, dsh_command
-            )
-        installer = installers()[host](**options) if host == "minimax" else None
-        native = {"native_endpoint": installer.native_endpoint()} if installer is not None else {}
-        connection = prepare_setup_transport(
-            host,
-            server_url=server_url,
-            allow_insecure_http=allow_insecure_http,
-            json_output=json_output,
-            dsh_target=options.get("dsh_target"),
-            **native,
-        )
-        if installer is None:
-            installer = installers()[host](**options)
-        result = installer.configure(connection)
-        return {"status": "configured", "result": result}
-
-    report_agents(selected, configure, json_output=json_output)
-
-
 @app.command("init")
 def init_command(
     output: Annotated[Path, typer.Option("--output", "-o", help="Environment file to create.")] = Path(".env"),
@@ -378,19 +297,10 @@ def init_command(
         run_wizard(output, language=None if language is None else language.value, advanced=advanced)
         return
 
-    from powercontext.server.configuration import ServerConfigurationError, has_uds_configuration
-
     if output.exists() and not force:
         _fail(f"{output} already exists; use --force")
     try:
         existing = output.read_text(encoding="utf-8") if output.exists() else ""
-        values = parse_environment(existing, source=str(output))
-        if has_uds_configuration(values) or has_uds_configuration(values, os.environ):
-            raise ConfigError(  # noqa: TRY003, TRY301
-                "The template supports TCP listeners; edit UDS configuration directly in the environment file "
-                "and clear process UDS overrides before using the template. "
-                "/ 模板目前仅支持 TCP 监听。UDS 配置请直接编辑环境文件。请在使用模板前清除进程中的 UDS 配置。"
-            )
         configuration = collect_configuration(advanced=advanced)
         _validate_operational_configuration(configuration)
         _print_summary(configuration)
@@ -399,14 +309,7 @@ def init_command(
             typer.echo("No changes written.")
             return
         backup = write_environment(output, content, backup=output.exists())
-    except (
-        ConfigError,
-        EnvironmentFileError,
-        OSError,
-        UnicodeError,
-        ValidationError,
-        ServerConfigurationError,
-    ) as error:
+    except (ConfigError, EnvironmentFileError, OSError, UnicodeError, ValidationError) as error:
         _fail(str(error))
     _report_written(output, backup)
     _print_next_steps(output)

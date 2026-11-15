@@ -20,7 +20,7 @@ from datetime import date, datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from powercontext.artifacts import ArtifactRef
 from powercontext.builtin.inference import TokenEstimatorProfile
@@ -51,8 +51,6 @@ class ModelUsagePurpose(StrEnum):
     EXPERIENCE_GENERATION = "experience_generation"
     SKILL_GENERATION = "skill_generation"
     HANDOFF_GENERATION = "handoff_generation"
-    PROFILE_GENERATION = "profile_generation"
-    PROMPT_GENERATION = "prompt_generation"
     TOPIC_MEMORY_GENERATION = "topic_memory_generation"
     TOPIC_MEMORY_RECALL = "topic_memory_recall"
     TOPIC_MEMORY_INDEXING = "topic_memory_indexing"
@@ -110,7 +108,7 @@ class CandidateInventoryStatistics(BaseModel):
 
 
 class MemoryEntryInventoryStatistics(BaseModel):
-    """Atomic Memory heads grouped by kind; inactive covers forgotten, merged and retired."""
+    """Current logical Memory entries grouped by state and kind."""
 
     total: int = Field(ge=0)
     active: int = Field(ge=0)
@@ -181,56 +179,6 @@ class UsageStatistics(BaseModel):
     totals: ModelUsageStatistics
     by_purpose: tuple[ModelUsagePurposeBreakdown, ...]
     daily: tuple[ModelUsageDay, ...]
-
-
-class RecallEffortMeasurement(BaseModel):
-    """One content-free recall observation, ready for additive daily persistence.
-
-    This internal measurement is not part of the statistics overview or any
-    transport response. Its reason vocabulary excludes arbitrary query text.
-    """
-
-    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
-
-    policy_id: str = Field(min_length=1, max_length=128)
-    assessment: Literal[
-        "sufficient",
-        "no-content",
-        "budget-floor",
-        "rerank-enabled",
-        "thin-candidates",
-        "thin-families",
-        "weak-top-1",
-        "weak-lexical",
-        "at-max-rounds",
-        "expansion-failed",
-    ]
-    preparations: Literal[1] = 1
-    rounds: int = Field(ge=1, le=3)
-    expanded_preparations: int = Field(ge=0, le=1)
-    admission_expansions: int = Field(ge=0, le=1)
-    policy_floor_expansions: int = Field(ge=0, le=1)
-    candidate_round_samples: int = Field(ge=1, le=3)
-    candidates_assessed: int = Field(ge=0)
-    final_candidate_pool: int = Field(ge=0)
-    added_embeddings: int = Field(ge=0)
-    added_generation_calls: int = Field(ge=0)
-    truncated_items: int = Field(ge=0)
-    dropped_items: int = Field(ge=0)
-    dropped_below_min_bytes: int = Field(ge=0)
-    dropped_no_fitting_truncation: int = Field(ge=0)
-
-    @model_validator(mode="after")
-    def validate_accounting(self) -> RecallEffortMeasurement:
-        if self.dropped_items != self.dropped_below_min_bytes + self.dropped_no_fitting_truncation:
-            raise ValueError("recall effort drop subclasses must sum to dropped_items")  # noqa: TRY003
-        if self.rounds != self.candidate_round_samples:
-            raise ValueError("recall effort needs one candidate sample per committed round")  # noqa: TRY003
-        if self.rounds != 1 + self.admission_expansions + self.policy_floor_expansions:
-            raise ValueError("recall effort rounds must match committed expansions")  # noqa: TRY003
-        if self.expanded_preparations != int(self.rounds > 1):
-            raise ValueError("recall effort expanded preparation count must match rounds")  # noqa: TRY003
-        return self
 
 
 class RecallTokenMeasurement(BaseModel):
@@ -308,61 +256,6 @@ class RecurrenceStatistics(BaseModel):
     top_revisions: tuple[RecurrenceStreak, ...] = Field(max_length=MAX_RECURRENCE_TOP_REVISIONS)
 
 
-class ProcessingObservation(BaseModel):
-    """Durable invocation progress and a separately identified local scheduler sample."""
-
-    binding: str
-    family: str | None = None
-    state: Literal["idle", "dirty", "pending", "acknowledged", "queued", "running", "retry_wait", "blocked"]
-    observed_at: datetime
-    scheduler_observed: bool = False
-    reason: Literal[
-        "unobserved",
-        "waiting_schedule",
-        "waiting_dispatch",
-        "waiting_capacity",
-        "executing",
-        "retry_backoff",
-        "policy_block",
-        "idle",
-    ] = "unobserved"
-    requested_generation: int = Field(default=0, ge=0)
-    handled_generation: int = Field(default=0, ge=0)
-    dirty_generation: int = Field(default=0, ge=0)
-    clean_generation: int = Field(default=0, ge=0)
-    pending_since: datetime | None = None
-    running_seconds: float | None = Field(default=None, ge=0)
-    next_check_seconds: float | None = Field(default=None, ge=0)
-    worker_id: str | None = None
-    attempt_generation: int | None = Field(default=None, ge=0)
-    retry_failures: int | None = Field(default=None, ge=0)
-    block_code: str | None = None
-    last_error_code: str | None = None
-    last_error_stage: str | None = None
-    last_error_at: datetime | None = None
-    last_error_worker_id: str | None = None
-    last_error_trace_id: str | None = None
-
-
-class BootstrapDeliveryReading(BaseModel):
-    """Current retained receipt states grouped by integration and preparation period."""
-
-    integration: str
-    state: Literal["pending", "injected", "skipped", "failed"]
-    receipts: int = Field(ge=0)
-    content_bytes: int = Field(ge=0)
-    last_prepared_at: datetime
-
-
-class BootstrapDeliveryStatistics(BaseModel):
-    """Host-reported delivery does not establish model adoption or billing savings."""
-
-    period: ResolvedUsagePeriod
-    retention_days: int = 30
-    actual_adoption: Literal["unobserved"] = "unobserved"
-    by_integration: tuple[BootstrapDeliveryReading, ...] = ()
-
-
 class ScopeStatistics(BaseModel):
     """Statistics retained for one Scope inside a resolved selection."""
 
@@ -371,8 +264,6 @@ class ScopeStatistics(BaseModel):
     usage: UsageStatistics
     recall: RecallTokenStatistics
     recurrence: RecurrenceStatistics
-    processing: tuple[ProcessingObservation, ...] = ()
-    bootstrap_delivery: BootstrapDeliveryStatistics | None = None
 
 
 class Statistics(BaseModel):
@@ -396,8 +287,6 @@ class Statistics(BaseModel):
 __all__ = [
     "MAX_RECURRENCE_TOP_REVISIONS",
     "ArtifactInventoryStatistics",
-    "BootstrapDeliveryReading",
-    "BootstrapDeliveryStatistics",
     "CandidateFamilyCount",
     "CandidateInventoryStatistics",
     "FamilyCount",
@@ -411,7 +300,6 @@ __all__ = [
     "ModelUsagePurposeBreakdown",
     "ModelUsageStatistics",
     "ModelUsageValue",
-    "RecallEffortMeasurement",
     "RecallTokenDay",
     "RecallTokenMeasurement",
     "RecallTokenStatistics",
