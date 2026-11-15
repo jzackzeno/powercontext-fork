@@ -4,158 +4,21 @@
 from __future__ import annotations
 
 from datetime import date as date_aliased
-from enum import Enum, IntEnum, StrEnum
+from enum import StrEnum
 from typing import Annotated, Any, Literal
-from uuid import UUID
 
 from pydantic import (
     AwareDatetime,
     BaseModel,
     ConfigDict,
-    Discriminator,
     Field,
     RootModel,
     StrictBool,
     StrictFloat,
     StrictInt,
     StrictStr,
-    field_validator,
     model_validator,
 )
-from pydantic import (
-    Tag as UnionTag,
-)
-
-
-class GatewayLifecycleDecision(StrEnum):
-    DEADLINE_EXCEEDED = "deadline_exceeded"
-    GATEWAY_SHUTDOWN = "gateway_shutdown"
-    REQUEST_CANCELLED = "request_cancelled"
-
-
-class GatewayModelSend(StrEnum):
-    NO_SEND = "no_send"
-    DEFINITELY_NOT_SENT = "definitely_not_sent"
-    POSSIBLY_SENT = "possibly_sent"
-    RESPONSE_RECEIVED = "response_received"
-
-
-class GatewayLifecycleError(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    decision: GatewayLifecycleDecision
-    model_send: GatewayModelSend
-
-
-class ContractVersion(BaseModel):
-    major: Annotated[StrictInt, Field(ge=1)]
-    minor: Annotated[StrictInt, Field(ge=0)]
-
-
-class FeatureContract(BaseModel):
-    version: ContractVersion
-    operations: Annotated[list[StrictStr], Field(min_length=1)]
-
-
-class Product(StrEnum):
-    POWERCONTEXT = "powercontext"
-
-
-class ServerInfo(BaseModel):
-    schema_version: Annotated[
-        ContractVersion, Field(description="Compatibility version for this response shape and field semantics.")
-    ]
-    product: Product
-    server_id: Annotated[
-        StrictStr,
-        Field(
-            description="Opaque identity of the durable Server deployment. It is unrelated to Access deployment_id and remains stable across restarts, upgrades, backup restore and replicas sharing the same primary database.",
-            max_length=128,
-            min_length=1,
-        ),
-    ]
-    package_version: Annotated[StrictStr, Field(min_length=1)]
-    api_contract_version: Annotated[
-        ContractVersion, Field(description="Major/minor projection of the OpenAPI info.version served by this package.")
-    ]
-    feature_contracts: Annotated[
-        dict[str, FeatureContract], Field(description="Stable feature groups keyed by contract name.")
-    ]
-
-
-class Tag(RootModel[StrictStr]):
-    root: Annotated[StrictStr, Field(min_length=1)]
-
-
-class Code(StrEnum):
-    PAGE = "page"
-    EMPTY_INVENTORY = "empty_inventory"
-
-
-class AtomicMemoryState(StrEnum):
-    ACTIVE = "active"
-    FORGOTTEN = "forgotten"
-    MERGED = "merged"
-    RETIRED = "retired"
-
-
-class Family(StrEnum):
-    ATOMIC_MEMORY = "atomic-memory"
-
-
-class AtomicMemoryTarget(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    artifact_id: Annotated[StrictStr, Field(max_length=128, min_length=1)]
-    revision: Annotated[StrictInt | None, Field(ge=1)] = None
-
-
-class MatchedByEnum(StrEnum):
-    TEXT = "text"
-    VECTOR = "vector"
-
-
-class AtomicMemoryRestorationItem(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    artifact_id: Annotated[StrictStr, Field(min_length=1)]
-    source_revision: Annotated[StrictInt, Field(ge=1)]
-    creates_revision: StrictBool
-
-
-class AtomicMemoryRestorationEndpoint(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    artifact_id: Annotated[StrictStr, Field(min_length=1)]
-    revision: Annotated[StrictInt, Field(ge=1)]
-    state_version: Annotated[StrictInt, Field(ge=0)]
-
-
-class UndoMergeResult(RootModel[StrictStr]):
-    root: Annotated[StrictStr, Field(min_length=1)]
-
-
-class AtomicMemoryContentSchema(StrEnum):
-    POWERCONTEXT_ATOMIC_MEMORY_V1 = "powercontext.atomic-memory.v1"
-
-
-class AtomicMemorySearchMode(StrEnum):
-    TEXT = "text"
-    VECTOR = "vector"
-    HYBRID = "hybrid"
-
-
-class AtomicMemoryRestorationOperation(StrEnum):
-    RESTORE = "restore"
-    UNDO_MERGE = "undo_merge"
-
-
-class AtomicMemoryLifecycleState(StrEnum):
-    FORGOTTEN = "forgotten"
 
 
 class SubjectType(StrEnum):
@@ -234,18 +97,6 @@ class ProfileSourceWindow(BaseModel):
     through: Annotated[StrictInt, Field(ge=0)]
 
 
-class FormatVersion(IntEnum):
-    INTEGER_1 = 1
-
-
-class ProfileDreamPolicy(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    format_version: FormatVersion
-    generation_enabled: StrictBool
-
-
 class Schema(StrEnum):
     POWERCONTEXT_PROFILE_CANDIDATE_V1 = "powercontext.profile-candidate.v1"
 
@@ -256,25 +107,13 @@ class ProfileCandidateProposal(BaseModel):
     )
     schema_: Annotated[Schema, Field(alias="schema")]
     content: Annotated[StrictStr, Field(min_length=1)]
-    source_window: ProfileSourceWindow | None = None
-    dream_run_id: StrictStr | None = None
-    policy_snapshot: ProfileDreamPolicy | None = None
-    policy_digest: StrictStr | None = None
+    source_window: ProfileSourceWindow
     generator_id: Annotated[StrictStr, Field(min_length=1)]
     generator_version: Annotated[StrictStr, Field(min_length=1)]
     created_at: AwareDatetime
 
 
-class TopicMemoryDreamProposal(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    title: Annotated[StrictStr, Field(max_length=512, min_length=1)]
-    summary: Annotated[StrictStr, Field(max_length=8000, min_length=1)]
-    detail: Annotated[StrictStr, Field(max_length=125000, min_length=1)]
-
-
-class Family1(StrEnum):
+class Family(StrEnum):
     PROFILE = "profile"
 
 
@@ -291,22 +130,6 @@ class ReplaceProfileArtifactRequest(BaseModel):
         extra="forbid",
     )
     content: ProfileWriteContent
-    restored_from_revision: Annotated[
-        StrictInt | None,
-        Field(
-            description="Historical Profile revision restored by this replacement. Must match content.restored_from_revision when both are set.",
-            ge=1,
-        ),
-    ] = None
-    reason: Annotated[
-        StrictStr | None,
-        Field(
-            description="Required when restored_from_revision or content.restored_from_revision is set.",
-            max_length=1024,
-            min_length=1,
-            pattern=".*\\S.*",
-        ),
-    ] = None
 
 
 class ArtifactReference(BaseModel):
@@ -316,23 +139,6 @@ class ArtifactReference(BaseModel):
     family: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
     artifact_id: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
     revision: Annotated[StrictInt, Field(ge=1)]
-
-
-class BindArtifactHandleRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    artifact_id: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
-    revision: Annotated[StrictInt, Field(ge=1)]
-
-
-class ArtifactHandleBinding(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    family: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
-    key: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[a-z0-9]+(?:-[a-z0-9]+)*$")]
-    artifact: ArtifactReference
 
 
 class ArtifactAddress(BaseModel):
@@ -539,13 +345,6 @@ class CandidatePermissions(BaseModel):
 class DreamOperation(StrEnum):
     REFINE_EXPERIENCE = "refine_experience"
     DERIVE_SKILL = "derive_skill"
-    REVISE_SKILL = "revise_skill"
-    REVISE_PROFILE = "revise_profile"
-    REVISE_MEMORY = "revise_memory"
-    REVISE_TOPIC_MEMORY = "revise_topic_memory"
-    REFRESH_HANDOFF = "refresh_handoff"
-    REVISE_PROMPT = "revise_prompt"
-    REVISE_TAGS = "revise_tags"
 
 
 class DreamStatus(StrEnum):
@@ -565,19 +364,12 @@ class DreamEvidenceKind(StrEnum):
     SOURCE = "source"
     EXPERIENCE = "experience"
     MEMORY = "memory"
-    PROFILE = "profile"
-    TOPIC_MEMORY = "topic_memory"
-    HANDOFF = "handoff"
-    SKILL = "skill"
-    PROMPT = "prompt"
-    CATALOG_TARGET = "catalog_target"
     UNRESOLVED = "unresolved"
 
 
 class DreamEvidenceRole(StrEnum):
     ROOT = "root"
     DERIVED = "derived"
-    TARGET = "target"
     LINEAGE_ONLY = "lineage_only"
     UNRESOLVED = "unresolved"
 
@@ -585,6 +377,14 @@ class DreamEvidenceRole(StrEnum):
 class DreamEvidenceIndependence(StrEnum):
     ATTESTED = "attested"
     UNKNOWN = "unknown"
+
+
+class DreamSourceReference(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    source_type: Annotated[StrictStr, Field(max_length=128, min_length=1)]
+    source_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
 
 
 class ListDreamRunsRequest(BaseModel):
@@ -608,19 +408,13 @@ class DreamBudget(BaseModel):
     max_depth: Annotated[StrictInt, Field(ge=1, le=8)] = 8
     max_output_tokens: Annotated[StrictInt, Field(ge=1, le=4096)] = 4096
     max_model_calls: Annotated[StrictInt, Field(ge=1, le=2)] = 2
-    timeout_seconds: Annotated[StrictFloat, Field(gt=0.0, le=120.0)] = 120
-
-
-class Kind(StrEnum):
-    ARTIFACT = "artifact"
-    TAG = "tag"
+    timeout_seconds: Annotated[StrictFloat, Field(ge=0.0, gt=1.0, le=120.0)] = 120
 
 
 class DreamCandidateRef(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    kind: Kind = Kind.ARTIFACT
     candidate_id: StrictStr
     version: Annotated[StrictInt, Field(ge=1)]
 
@@ -642,290 +436,22 @@ class DreamEvidenceEdge(BaseModel):
     upstream_id: StrictStr
 
 
-class CandidateKind(StrEnum):
-    ARTIFACT = "artifact"
-    TAG = "tag"
+class DreamRootEvidenceGroup(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    group_id: StrictStr
+    sources: list[DreamSourceReference]
+    independence: DreamEvidenceIndependence = DreamEvidenceIndependence.UNKNOWN
 
 
-class Origin(StrEnum):
-    DREAM = "dream"
-    MANUAL = "manual"
-
-
-class ApproveCandidateRequest(BaseModel):
+class ApproveArtifactCandidateRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
     candidate_id: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
     expected_version: Annotated[StrictInt, Field(ge=1)]
-
-
-class OutputKind(StrEnum):
-    CANDIDATE = "candidate"
-    TAG_CANDIDATE = "tag_candidate"
-
-
-class Effect(StrEnum):
-    REVIEW_THEN_PUBLISH = "review_then_publish"
-    REVIEW_THEN_PUBLISH_CONFIGURATION = "review_then_publish_configuration"
-    REVIEW_THEN_REPLACE_TAGS = "review_then_replace_tags"
-
-
-class ArtifactDreamingOperationCapability(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    operation: DreamOperation
-    output_kind: OutputKind
-    effect: Effect
-
-
-class PluginKind(StrEnum):
-    ARTIFACT = "artifact"
-
-
-class PluginLoadStatus(StrEnum):
-    LOADED = "loaded"
-    FAILED = "failed"
-
-
-class PluginTrigger(StrEnum):
-    SCHEDULE = "schedule"
-    SOURCES = "sources"
-
-
-class PluginState(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    name: StrictStr
-    kind: PluginKind
-    status: PluginLoadStatus
-    error: Annotated[StrictStr | None, Field(description="Safe failure category from the startup check.")]
-    family: Annotated[StrictStr | None, Field(...)]
-    binding_name: Annotated[StrictStr | None, Field(...)]
-    scopes: Annotated[list[StrictStr] | None, Field(...)]
-    source_types: Annotated[
-        list[StrictStr] | None,
-        Field(description="Source types delivered to the plugin; null when it consumes no Sources."),
-    ]
-    triggers: list[PluginTrigger]
-
-
-class PluginPage(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    items: list[PluginState]
-
-
-class PluginScopeState(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: StrictStr
-    pending: Annotated[
-        StrictBool, Field(description="New Sources or a schedule request are waiting for an invocation.")
-    ]
-    consumed_position: Annotated[
-        StrictInt | None,
-        Field(
-            description="Source journal position the plugin has consumed through; null when it consumes no Sources.",
-            ge=0,
-        ),
-    ]
-    source_position: Annotated[
-        StrictInt | None, Field(description="Latest Source journal position in the Scope, of any Source type.", ge=0)
-    ]
-
-
-class ListPluginScopesRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    cursor: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    limit: Annotated[StrictInt, Field(ge=1, le=200)] = 50
-
-
-class PluginScopePage(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    items: list[PluginScopeState]
-    next_cursor: Annotated[StrictStr | None, Field(...)]
-
-
-class ArtifactLifecycleState(StrEnum):
-    ACTIVE = "active"
-    DEPRECATED = "deprecated"
-    RETIRED = "retired"
-
-
-class ArtifactGovernanceInput(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    artifact_id: Annotated[StrictStr, Field(max_length=128, min_length=1)]
-    revision: Annotated[StrictInt, Field(ge=1)]
-    state_version: Annotated[StrictInt, Field(ge=0)]
-
-
-class ForgetArtifactRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    revision: Annotated[StrictInt, Field(ge=1)]
-    state_version: Annotated[StrictInt, Field(ge=0)]
-
-
-class ArtifactRestorationOperation(StrEnum):
-    RESTORE = "restore"
-    UNDO_MERGE = "undo_merge"
-
-
-class RestoreArtifactRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    operation: ArtifactRestorationOperation = ArtifactRestorationOperation.RESTORE
-    revision: Annotated[
-        StrictInt | None,
-        Field(
-            description="Content revision to restore; omitted restores the current one. Not accepted with undo_merge.",
-            ge=1,
-        ),
-    ] = None
-
-
-class ArtifactGovernanceRecord(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    artifact: ArtifactReference
-    lifecycle_state: ArtifactLifecycleState
-    state_version: Annotated[StrictInt, Field(ge=0)]
-    merged_into_id: Annotated[StrictStr | None, Field(...)]
-
-
-class ArtifactGovernanceResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    changed: StrictBool
-    records: list[ArtifactGovernanceRecord]
-
-
-class ArtifactRestorationResult(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    changed: StrictBool
-    restored: list[ArtifactReference]
-    retired: list[ArtifactReference]
-    undo_merge_results: list[StrictStr]
-
-
-class CreatePluginArtifactRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    family: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[a-z][a-z0-9-]*$")]
-    content: dict[str, Any]
-
-
-class ReplacePluginArtifactRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    content: dict[str, Any]
-
-
-class Configuration(StrEnum):
-    CONFIGURED = "configured"
-    UNCONFIGURED = "unconfigured"
-    UNKNOWN = "unknown"
-
-
-class Location(StrEnum):
-    LOCAL = "local"
-    EXTERNAL = "external"
-    NONE = "none"
-
-
-class Role(StrEnum):
-    LEADER = "leader"
-    STANDBY = "standby"
-
-
-class State(StrEnum):
-    RUNNING = "running"
-    DEGRADED = "degraded"
-    STOPPED = "stopped"
-    UNKNOWN = "unknown"
-
-
-class ExtractionBackground(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    location: Annotated[
-        Location,
-        Field(
-            description="Placement of the Memory Supervisor. None means no background executor; synchronous flush may still work."
-        ),
-    ]
-    role: Annotated[
-        Role | None,
-        Field(
-            description="Current local Supervisor leadership role. Standby is normal; null means no running local Supervisor."
-        ),
-    ] = None
-    state: Annotated[
-        State,
-        Field(
-            description="Local Supervisor lifecycle and control state, independent of individual worker outcomes. A running Supervisor may be retrying failed workers. External state is unknown."
-        ),
-    ]
-    automatic_processing_enabled: Annotated[
-        StrictBool | None,
-        Field(
-            description="Whether this process schedules automatic Memory extraction. False still permits explicit flush and recovery of accepted work. Null means the external worker schedule is unknown."
-        ),
-    ] = None
-
-
-class Status1(StrEnum):
-    UNVERIFIED = "unverified"
-    OBSERVED = "observed"
-
-
-class Stage(StrEnum):
-    INFERENCE = "inference"
-    FLUSH = "flush"
-    WORKER = "worker"
-    SUPERVISOR = "supervisor"
-    LEASE_RENEWAL = "lease_renewal"
-    SCOPE_DISCOVERY = "scope_discovery"
-
-
-class ExtractionFailure(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    code: Annotated[
-        StrictStr,
-        Field(
-            description="Sanitized category: model_configuration_error, model_timeout, model_unavailable, invalid_model_output, worker_timeout, worker_crash, invalid_worker_result, missing_durable_acknowledgement, supervisor_failed, lease_renewal_failed, scope_discovery_failed, or processing_failed. Raw exception messages, model inputs, and credentials are never returned."
-        ),
-    ]
-    stage: Annotated[
-        Stage,
-        Field(
-            description="Inference for recognized model failures; otherwise the boundary where failure was observed. Flush or worker does not identify the failing internal component."
-        ),
-    ]
-    occurred_at: Annotated[AwareDatetime, Field(description="UTC time when this process observed the failure.")]
 
 
 class FamilyCount(BaseModel):
@@ -1053,90 +579,6 @@ class RecallTokenDay(BaseModel):
     token_reduction: StrictInt
 
 
-class ProcessingState(StrEnum):
-    IDLE = "idle"
-    DIRTY = "dirty"
-    PENDING = "pending"
-    ACKNOWLEDGED = "acknowledged"
-    QUEUED = "queued"
-    RUNNING = "running"
-    RETRY_WAIT = "retry_wait"
-    BLOCKED = "blocked"
-
-
-class ProcessingReason(StrEnum):
-    UNOBSERVED = "unobserved"
-    WAITING_SCHEDULE = "waiting_schedule"
-    WAITING_DISPATCH = "waiting_dispatch"
-    WAITING_CAPACITY = "waiting_capacity"
-    EXECUTING = "executing"
-    RETRY_BACKOFF = "retry_backoff"
-    POLICY_BLOCK = "policy_block"
-    IDLE = "idle"
-
-
-class ProcessingObservation(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    binding: StrictStr
-    family: StrictStr | None = None
-    state: ProcessingState
-    observed_at: AwareDatetime
-    scheduler_observed: StrictBool = False
-    reason: ProcessingReason = ProcessingReason.UNOBSERVED
-    requested_generation: Annotated[StrictInt, Field(ge=0)] = 0
-    handled_generation: Annotated[StrictInt, Field(ge=0)] = 0
-    dirty_generation: Annotated[StrictInt, Field(ge=0)] = 0
-    clean_generation: Annotated[StrictInt, Field(ge=0)] = 0
-    pending_since: Annotated[
-        AwareDatetime | None, Field(description="Local lower bound, not the durable age of all pending work.")
-    ] = None
-    running_seconds: Annotated[StrictFloat | None, Field(ge=0.0)] = None
-    next_check_seconds: Annotated[
-        StrictFloat | None,
-        Field(description="Estimated seconds until a scheduler check, not a promised execution deadline.", ge=0.0),
-    ] = None
-    worker_id: StrictStr | None = None
-    attempt_generation: Annotated[StrictInt | None, Field(ge=0)] = None
-    retry_failures: Annotated[StrictInt | None, Field(ge=0)] = None
-    block_code: StrictStr | None = None
-    last_error_code: Annotated[
-        StrictStr | None,
-        Field(
-            description="Content-free failure category for this Scope and binding's current local retry cycle. Absent before observation or after acknowledgement, restart, or retry-cache eviction. Never an exception message."
-        ),
-    ] = None
-    last_error_stage: Annotated[
-        StrictStr | None,
-        Field(
-            description="Owning observation boundary such as authorization, inference, worker, work_admission, or completion. Does not locate an internal domain operation."
-        ),
-    ] = None
-    last_error_at: Annotated[
-        AwareDatetime | None,
-        Field(
-            description="UTC time the local supervisor observed this failure, not the child event time or a durable history."
-        ),
-    ] = None
-    last_error_worker_id: Annotated[
-        StrictStr | None,
-        Field(
-            description="Existing execution identity of the last failed worker in this local retry cycle. Absent for admission failures without a launched worker. Not a metric label."
-        ),
-    ] = None
-    last_error_trace_id: Annotated[
-        StrictStr | None,
-        Field(
-            description="Existing trace identity of the last failed worker when supplied by the tracing adapter. Does not prove sampling or backend storage. Cleared with the local failure observation."
-        ),
-    ] = None
-
-
-class ActualAdoption(StrEnum):
-    UNOBSERVED = "unobserved"
-
-
 class WorkClaimBasis(StrEnum):
     DECLARED = "declared"
     VERIFIED = "verified"
@@ -1236,14 +678,6 @@ class TaskCheckStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
-class TaskStopReasonKind(StrEnum):
-    SAFETY = "safety"
-    AUTHORIZATION = "authorization"
-    CAPABILITY = "capability"
-    MISSING_EVIDENCE = "missing_evidence"
-    SCOPE = "scope"
-
-
 class Schema3(StrEnum):
     POWERCONTEXT_TASK_OUTCOME_V1 = "powercontext.task-outcome.v1"
 
@@ -1270,45 +704,7 @@ class CaptureContentSourceRequest(BaseModel):
             min_length=1,
         ),
     ]
-    metadata: Annotated[
-        dict[str, Any] | None,
-        Field(
-            description="Caller metadata. The reserved kind value `working_note` is rejected; use the dedicated Working Note capture operation instead."
-        ),
-    ] = None
-
-
-class WorkingNoteKind(StrEnum):
-    INSPECTION = "inspection"
-    ABANDONED_APPROACH = "abandoned_approach"
-    VALIDATION = "validation"
-    UNRESOLVED = "unresolved"
-    HOST_CONTEXT = "host_context"
-
-
-class CaptureWorkingNoteRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    source_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    content: Annotated[StrictStr, Field(max_length=200000, min_length=1, pattern=".*\\S.*")]
-    session_id: Annotated[
-        StrictStr,
-        Field(
-            description="Host/session correlation only; it is not an authorization boundary.",
-            max_length=256,
-            min_length=1,
-            pattern=".*\\S.*",
-        ),
-    ]
-    note_kind: WorkingNoteKind
-    expires_at: Annotated[
-        AwareDatetime | None,
-        Field(
-            description="Optional logical expiry. It must be in the future when captured. Expiry makes the note unavailable to new Handoff evidence resolution but does not physically delete or rewrite the Source."
-        ),
-    ] = None
+    metadata: dict[str, Any] | None = None
 
 
 class SourceProjectionKey(BaseModel):
@@ -1413,7 +809,7 @@ class CommitConnectorCheckpointRequest(BaseModel):
     checkpoint: Annotated[Any | None, Field(...)]
 
 
-class Kind1(StrEnum):
+class Kind(StrEnum):
     ARTIFACT = "artifact"
 
 
@@ -1423,6 +819,10 @@ class HandoffArtifactCitation(BaseModel):
     )
     kind: Literal["artifact"]
     artifact_ref: ArtifactReference
+
+
+class Kind1(StrEnum):
+    MEMORY = "memory"
 
 
 class Trust3(StrEnum):
@@ -1452,379 +852,6 @@ class EditStatus(StrEnum):
 
 class HandoffPromptKey(StrEnum):
     HANDOFF_GENERATE = "handoff.generate"
-
-
-class Schema4(StrEnum):
-    POWERCONTEXT_PREPARED_CONTEXT_RECEIPT_V1 = "powercontext.prepared-context-receipt.v1"
-
-
-class PolicyId(StrEnum):
-    POWERCONTEXT_PREPARED_CONTEXT_RECEIPT_V1 = "powercontext.prepared-context-receipt.v1"
-
-
-class Outcome(StrEnum):
-    COMPLETED = "completed"
-    EXPANSION_FAILED = "expansion_failed"
-
-
-class PreparedContextRecallRound(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    round: Annotated[StrictInt, Field(ge=0, le=2)]
-    outcome: Outcome
-    retained: StrictBool
-
-
-class Mode3(StrEnum):
-    FTS = "fts"
-    VECTOR = "vector"
-    HYBRID = "hybrid"
-    SNAPSHOT = "snapshot"
-    CODE = "code"
-    NONE = "none"
-
-
-class Outcome1(StrEnum):
-    COMPLETED = "completed"
-    NOT_RUN = "not_run"
-    FAILED = "failed"
-
-
-class FallbackReason(StrEnum):
-    NONE = "none"
-    INFERENCE_UNAVAILABLE = "inference_unavailable"
-    INFERENCE_TIMEOUT = "inference_timeout"
-    REUSED_FTS_FALLBACK = "reused_fts_fallback"
-
-
-class PreparedContextSearchGroup(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    round: Annotated[StrictInt, Field(ge=0, le=2)]
-    family: Annotated[
-        StrictStr,
-        Field(
-            description="atomic-memory, topic-memory, experience, profile, code, or a loaded plugin family.",
-            max_length=128,
-            min_length=1,
-            pattern="^[a-z][a-z0-9-]*$",
-        ),
-    ]
-    mode: Mode3
-    outcome: Outcome1
-    fallback_reason: FallbackReason
-    count: Annotated[StrictInt, Field(ge=1)]
-
-
-class PreparedContextPromptArtifactAddress(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    artifact: ArtifactReference
-
-
-class Outcome2(StrEnum):
-    SELECTED = "selected"
-    FALLBACK = "fallback"
-    FAILED = "failed"
-
-
-class FallbackReason1(StrEnum):
-    NONE = "none"
-    EMPTY_SELECTION = "empty_selection"
-    INFERENCE_UNAVAILABLE = "inference_unavailable"
-    INFERENCE_TIMEOUT = "inference_timeout"
-    INVALID_OUTPUT = "invalid_output"
-
-
-class PreparedContextRerankGroup(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    round: Annotated[StrictInt, Field(ge=0, le=2)]
-    config_id: Annotated[StrictStr, Field(pattern="^sha256:[0-9a-f]{64}$")]
-    outcome: Outcome2
-    fallback_reason: FallbackReason1
-    count: Annotated[StrictInt, Field(ge=1)]
-
-
-class PreparedContextCodeEvidence(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: StrictStr
-    fingerprint: StrictStr
-    path: StrictStr
-    file_sha256: StrictStr
-    start_line: Annotated[StrictInt, Field(ge=1)]
-    end_line: Annotated[StrictInt, Field(ge=1)]
-    snippet_sha256: StrictStr
-
-
-class PreparedContextSelectedItem(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    kind: Annotated[
-        StrictStr,
-        Field(
-            description="atomic-memory, topic-memory, experience, profile, code, or a loaded plugin family.",
-            max_length=128,
-            min_length=1,
-            pattern="^[a-z][a-z0-9-]*$",
-        ),
-    ]
-    artifact_address: ArtifactAddress | None = None
-    code_evidence: PreparedContextCodeEvidence | None = None
-    rendered_bytes: Annotated[StrictInt, Field(ge=0)]
-    truncated: StrictBool
-
-
-class Reason(StrEnum):
-    DUPLICATE = "duplicate"
-    BLANK = "blank"
-    FAMILY_LIMIT = "family_limit"
-    ENTRY_LIMIT = "entry_limit"
-    BELOW_MIN_BYTES = "below_min_bytes"
-    NO_FITTING_TRUNCATION = "no_fitting_truncation"
-    RERANK_NOT_SELECTED = "rerank_not_selected"
-    NOT_RETRIEVED = "not_retrieved"
-
-
-class PreparedContextOmittedGroup(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    family: Annotated[
-        StrictStr,
-        Field(
-            description="atomic-memory, topic-memory, experience, profile, code, or a loaded plugin family.",
-            max_length=128,
-            min_length=1,
-            pattern="^[a-z][a-z0-9-]*$",
-        ),
-    ]
-    reason: Reason
-    count: Annotated[StrictInt, Field(ge=1)]
-
-
-class PreparedContextStageTiming(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    stage: StrictStr
-    duration_ms: Annotated[StrictFloat, Field(ge=0.0)]
-    count: Annotated[StrictInt, Field(ge=1)]
-
-
-class Schema5(StrEnum):
-    POWERCONTEXT_PREPARED_CONTEXT_WITH_REUSE_V1 = "powercontext.prepared-context-with-reuse.v1"
-
-
-class Schema6(StrEnum):
-    POWERCONTEXT_CONTEXT_REUSE_V1 = "powercontext.context-reuse.v1"
-
-
-class PreserveEnum(StrEnum):
-    CONTENT = "content"
-    CITATIONS = "citations"
-    TRUST = "trust"
-    ORDER = "order"
-
-
-class RefreshOnEnum(StrEnum):
-    PERMISSION_CHANGE = "permission_change"
-    SOURCE_INELIGIBLE = "source_ineligible"
-    CONTEXT_BOUNDARY = "context_boundary"
-
-
-class ContextReuseConstraints(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    preserve: Annotated[list[PreserveEnum], Field(max_length=4, min_length=4)]
-    refresh_on: Annotated[list[RefreshOnEnum], Field(max_length=3, min_length=3)]
-
-
-class Schema7(StrEnum):
-    POWERCONTEXT_MODEL_JSON_PAYLOAD_V1 = "powercontext.model-json-payload.v1"
-
-
-class ModelJsonPayload(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Annotated[Schema7, Field(alias="schema")]
-    headers: Annotated[
-        dict[str, StrictStr],
-        Field(
-            description="Content and protocol headers only; credentials and transport override headers are forbidden.",
-            max_length=16,
-            min_length=1,
-        ),
-    ]
-    body: Annotated[
-        StrictStr,
-        Field(
-            description="Complete raw UTF-8 JSON text. Duplicate keys and non-finite numbers are unsupported.",
-            max_length=1048576,
-            min_length=2,
-        ),
-    ]
-
-
-class Schema8(StrEnum):
-    POWERCONTEXT_MODEL_JSON_TEXT_LOCATION_V1 = "powercontext.model-json-text-location.v1"
-
-
-class ModelJsonTextLocation(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Annotated[Schema8, Field(alias="schema")]
-    pointer: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    start_byte: Annotated[StrictInt, Field(ge=0)]
-    end_byte: Annotated[StrictInt, Field(ge=1)]
-
-
-class PreparedContextLocation(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    binding: Annotated[StrictStr, Field(max_length=65536, min_length=1)]
-    location: ModelJsonTextLocation
-
-
-class Phase(StrEnum):
-    BEFORE_SEND = "before_send"
-
-
-class CheckContextBeforeSend(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    phase: Literal["before_send"]
-    target_profile: Annotated[StrictStr, Field(max_length=128, min_length=1)]
-    payload: ModelJsonPayload
-    prepared_contexts: Annotated[list[PreparedContextLocation], Field(max_length=16)]
-
-
-class Phase1(StrEnum):
-    BEFORE_RELEASE = "before_release"
-
-
-class Completion(StrEnum):
-    COMPLETE = "complete"
-
-
-class CheckContextBeforeRelease(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    phase: Literal["before_release"]
-    target_profile: Annotated[StrictStr, Field(max_length=128, min_length=1)]
-    request_binding: Annotated[StrictStr, Field(max_length=65536, min_length=1)]
-    payload: ModelJsonPayload
-    completion: Completion
-
-
-class CheckContextRequest(RootModel[CheckContextBeforeSend | CheckContextBeforeRelease]):
-    root: Annotated[CheckContextBeforeSend | CheckContextBeforeRelease, Field(discriminator="phase")]
-
-
-class Profile(StrEnum):
-    TEXT_AND_TOOLS_V1 = "text-and-tools.v1"
-
-
-class ContextCheckCoverage(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    profile: Profile
-    complete: StrictBool
-
-
-class Schema9(StrEnum):
-    POWERCONTEXT_CONTEXT_CHECK_V1 = "powercontext.context-check.v1"
-
-
-class Phase2(StrEnum):
-    BEFORE_SEND = "before_send"
-    BEFORE_RELEASE = "before_release"
-
-
-class Decision(StrEnum):
-    ALLOW = "allow"
-    BLOCK = "block"
-    WITHHOLD = "withhold"
-
-
-class ReasonCode(RootModel[StrictStr]):
-    root: Annotated[StrictStr, Field(max_length=128)]
-
-
-class TargetProtocol(StrEnum):
-    OPENAI_CHAT = "openai-chat"
-    OPENAI_RESPONSES = "openai-responses"
-    ANTHROPIC_MESSAGES = "anthropic-messages"
-    OPENAI_EMBEDDINGS = "openai-embeddings"
-    MINIMAX_EMBEDDINGS = "minimax-embeddings"
-    JEV_RERANK = "jev-rerank"
-
-
-class ContextCheckResult(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Annotated[Schema9, Field(alias="schema")]
-    phase: Phase2
-    decision: Decision
-    reason_codes: Annotated[list[ReasonCode], Field(max_length=32)]
-    coverage: ContextCheckCoverage
-    policy_version: Annotated[StrictStr, Field(max_length=128, min_length=1)]
-    valid_until: AwareDatetime
-    correlate_until: Annotated[
-        AwareDatetime | None,
-        Field(description="Present only for a before_send allow; this deadline never permits a new send."),
-    ] = None
-    binding: Annotated[
-        StrictStr | None,
-        Field(
-            description="Present only for allow, bound to this phase, identity, target, policy, and exact payload.",
-            max_length=65536,
-            min_length=1,
-        ),
-    ] = None
-    target_endpoint: Annotated[
-        StrictStr | None,
-        Field(
-            description="Exact Core-configured endpoint, present only on an allow for before_send when X-PowerContext-Resolve-Target was authorized for a service principal.",
-            max_length=2048,
-        ),
-    ] = None
-    target_protocol: Annotated[
-        TargetProtocol | None,
-        Field(
-            description="Protocol of the Core-configured endpoint; present under the same condition as target_endpoint."
-        ),
-    ] = None
-
-
-class ContextProtectionCapabilitiesLimits(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    payload_bytes: Annotated[StrictInt, Field(ge=1)]
-    binding_bytes: Annotated[StrictInt, Field(ge=1)]
-    prepared_contexts: Annotated[StrictInt, Field(ge=1)]
-    dependencies: Annotated[StrictInt, Field(ge=1)]
-    send_seconds: Annotated[StrictInt, Field(ge=1)]
-    correlate_seconds: Annotated[StrictInt, Field(ge=1)]
 
 
 class RepairSurface(StrEnum):
@@ -2256,7 +1283,7 @@ class Validation(StrEnum):
     UNKNOWN = "unknown"
 
 
-class Outcome3(StrEnum):
+class Outcome(StrEnum):
     SUCCESS = "success"
     FAILURE = "failure"
     UNKNOWN = "unknown"
@@ -2297,96 +1324,6 @@ class FlushMemoryRequest(BaseModel):
         extra="forbid",
     )
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-
-
-class TopicMemoryProcessingStatusRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-
-
-class GetTopicMemoryProcessingBlockRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    block_id: Annotated[StrictStr, Field(max_length=36, min_length=1)]
-
-
-class RetryTopicMemoryProcessingRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    block_id: Annotated[StrictStr, Field(max_length=36, min_length=1)]
-
-
-class TopicMemoryProcessingBlock(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    block_id: StrictStr
-    attempt_id: StrictStr
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    binding_name: StrictStr
-    source_after: Annotated[StrictInt, Field(ge=0)]
-    source_through: Annotated[
-        StrictInt | None,
-        Field(description="Exact selected Source end; null when historical selection is unknown.", ge=1),
-    ]
-    budget_source_through: Annotated[
-        StrictInt | None,
-        Field(
-            description="Cumulative coverage of the original allowance; null only for imported blocks without that allowance.",
-            ge=1,
-        ),
-    ]
-    legacy_source_through: Annotated[
-        StrictInt | None,
-        Field(
-            description="Original ambiguous range of an imported attempts-table block; neither exact selection nor cumulative coverage.",
-            ge=1,
-        ),
-    ]
-    target_source_through: Annotated[StrictInt, Field(ge=1)]
-    attempts: Annotated[StrictInt, Field(ge=1)]
-    requests: Annotated[StrictInt, Field(ge=0)]
-    tokens: Annotated[StrictInt, Field(ge=0)]
-    error_code: StrictStr
-    last_error_code: Annotated[StrictStr | None, Field(...)]
-    blocked_at: AwareDatetime
-    retried_at: Annotated[AwareDatetime | None, Field(...)]
-    retry_request_generation: Annotated[StrictInt | None, Field(ge=1)]
-
-
-class TopicMemoryProcessingState(StrEnum):
-    IDLE = "idle"
-    PENDING = "pending"
-    BLOCKED = "blocked"
-
-
-class TopicMemoryProcessingRetryStatus(StrEnum):
-    ACCEPTED = "accepted"
-
-
-class TopicMemoryProcessingStatus(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    state: TopicMemoryProcessingState
-    source_cursor: Annotated[StrictInt, Field(ge=0)]
-    source_head: Annotated[StrictInt, Field(ge=0)]
-    target_source_through: Annotated[StrictInt | None, Field(ge=0)]
-    block: Annotated[TopicMemoryProcessingBlock | None, Field(...)]
-
-
-class RetryTopicMemoryProcessingResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    status: TopicMemoryProcessingRetryStatus
-    block: TopicMemoryProcessingBlock
 
 
 class FlushTopicMemoryRequest(BaseModel):
@@ -2444,7 +1381,7 @@ class GetTopicMemoryRequest(BaseModel):
     artifact: ArtifactReference
 
 
-class GetCandidateRequest(BaseModel):
+class GetArtifactCandidateRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -2500,6 +1437,15 @@ class ListExternalSkillsRequest(BaseModel):
     )
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
     include_unavailable: StrictBool = False
+
+
+class MemoryCitation(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    memory_ref: ArtifactReference
+    entry_id: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
+    entry_version_id: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
 
 
 class Kind3(StrEnum):
@@ -2664,7 +1610,7 @@ class CodeQueryRequest(BaseModel):
         return self
 
 
-class Schema10(StrEnum):
+class Schema4(StrEnum):
     POWERCONTEXT_CODE_QUERY_V1 = "powercontext.code-query.v1"
 
 
@@ -2673,7 +1619,7 @@ class GitObjectFormat(StrEnum):
     SHA256 = "sha256"
 
 
-class Status2(StrEnum):
+class Status1(StrEnum):
     OK = "ok"
     PARTIAL = "partial"
 
@@ -2682,7 +1628,7 @@ class CodeQueryResult(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    schema_: Annotated[Schema10, Field(alias="schema")] = Schema10.POWERCONTEXT_CODE_QUERY_V1
+    schema_: Annotated[Schema4, Field(alias="schema")] = Schema4.POWERCONTEXT_CODE_QUERY_V1
     scope_id: StrictStr
     fingerprint: Annotated[StrictStr, Field(pattern="^[0-9a-f]{64}$")]
     before_fingerprint: Annotated[StrictStr | None, Field(pattern="^[0-9a-f]{64}$")] = None
@@ -2691,17 +1637,17 @@ class CodeQueryResult(BaseModel):
     dirty: StrictBool
     checked_at: StrictStr
     operation: StrictStr
-    status: Status2 = Status2.OK
+    status: Status1 = Status1.OK
     items: list[dict[str, Any]] | None = None
     coverage: dict[str, Any] | None = None
     limitations: list[StrictStr] | None = None
 
 
-class Schema11(StrEnum):
+class Schema5(StrEnum):
     POWERCONTEXT_CODE_STATUS_V1 = "powercontext.code-status.v1"
 
 
-class Status3(StrEnum):
+class Status2(StrEnum):
     DISABLED = "disabled"
     MISSING = "missing"
     BUILDING = "building"
@@ -2720,9 +1666,9 @@ class CodeStatus(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    schema_: Annotated[Schema11, Field(alias="schema")] = Schema11.POWERCONTEXT_CODE_STATUS_V1
+    schema_: Annotated[Schema5, Field(alias="schema")] = Schema5.POWERCONTEXT_CODE_STATUS_V1
     scope_id: StrictStr
-    status: Status3
+    status: Status2
     freshness: Freshness = Freshness.UNKNOWN
     fingerprint: Annotated[StrictStr | None, Field(pattern="^[0-9a-f]{64}$")] = None
     engine: StrictStr = "powercontext-native-v1"
@@ -2748,47 +1694,11 @@ class CodeQueryResponse(RootModel[CodeQueryResult | CodeStatus]):
     root: CodeQueryResult | CodeStatus
 
 
-class Outcome4(StrEnum):
-    INJECTED = "injected"
-    FAILED = "failed"
-
-
-class RecordBootstrapDeliveryRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    receipt_id: Annotated[StrictStr, Field(max_length=64, min_length=1, pattern="^[\\x21-\\x7E]+$")]
-    outcome: Outcome4
-
-
-class ContextAssemblySection(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    family: Annotated[
-        StrictStr,
-        Field(
-            description="A built-in family (memory, experience, profile, topic-memory) or a loaded plugin family that implements search. A plugin family's entries come from the plugin's search with the request query and this limit; a family that is neither returns HTTP 422.",
-            max_length=128,
-            min_length=1,
-            pattern="^[a-z][a-z0-9-]*$",
-        ),
-    ]
-    search: Annotated[
-        dict[str, Any] | None,
-        Field(
-            description="Additional generic search fields passed to the plugin's search unchanged, such as mode, filters, fusion, or rerank. Only plugin families accept it; the query and limit come from the request and this section."
-        ),
-    ] = None
-    limit: Annotated[
-        StrictInt,
-        Field(
-            description="Maximum included entries. Each Profile entry is one Scope snapshot. Experience is limited to two. All section limits together must not exceed the Server's runtime.context_assembly_max_entries policy (default 8); exceeding it returns HTTP 422 before recall. The byte budget may reduce the actual output count.",
-            ge=1,
-            le=8,
-        ),
-    ]
+class ContextAssemblyFamily(StrEnum):
+    MEMORY = "memory"
+    EXPERIENCE = "experience"
+    PROFILE = "profile"
+    TOPIC_MEMORY = "topic-memory"
 
 
 class ContextAssemblyFormat(StrEnum):
@@ -2826,15 +1736,6 @@ class RememberMemoryRequest(BaseModel):
     text: Annotated[StrictStr, Field(description="Must not exceed 8192 UTF-8 bytes after normalization.", min_length=1)]
     reason: Annotated[StrictStr | None, Field(max_length=512)] = None
     expected_revision: Annotated[StrictInt | None, Field(ge=1)] = None
-    description: Annotated[
-        StrictStr | None,
-        Field(
-            description="Optional supplied single-line summary. When omitted, the Server stores a whitespace-collapsed text prefix of at most 200 Unicode characters, including a trailing ellipsis when truncated. Explicit writes do not invoke a generation model.",
-            max_length=200,
-            min_length=1,
-            pattern="^[^\\r\\n\\u0085\\u2028\\u2029]*\\S[^\\r\\n\\u0085\\u2028\\u2029]*$",
-        ),
-    ] = None
 
 
 class RetireMemoryEntryRequest(BaseModel):
@@ -2842,14 +1743,11 @@ class RetireMemoryEntryRequest(BaseModel):
         extra="forbid",
     )
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    citation: Annotated[
-        dict[str, Any],
-        Field(description="Legacy exact Memory entry citation. Requests that supply it are rejected as unsupported."),
-    ]
+    citation: MemoryCitation
     reason: Annotated[StrictStr | None, Field(max_length=512)] = None
 
 
-class RejectCandidateRequest(BaseModel):
+class RejectArtifactCandidateRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -2864,239 +1762,10 @@ class ReviseMemoryEntryRequest(BaseModel):
         extra="forbid",
     )
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    citation: Annotated[
-        dict[str, Any],
-        Field(description="Legacy exact Memory entry citation. Requests that supply it are rejected as unsupported."),
-    ]
+    citation: MemoryCitation
     kind: Annotated[StrictStr, Field(max_length=128, min_length=1)]
     text: Annotated[StrictStr, Field(description="Must not exceed 8192 UTF-8 bytes after normalization.", min_length=1)]
     reason: Annotated[StrictStr | None, Field(max_length=512)] = None
-
-
-class ArtifactSearchFusion(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    method: Annotated[StrictStr, Field(min_length=1, pattern=".*\\S.*")]
-    params: dict[str, Any] = {}
-
-    @field_validator("*", mode="after")
-    @classmethod
-    def _reject_invalid_search_value(cls, value: Any) -> Any:
-        from math import isfinite
-
-        from pydantic import ValidationError
-        from pydantic_core import InitErrorDetails
-
-        if value is None:
-            raise ValueError("omit the field instead of sending null")  # noqa: TRY003
-        errors: list[InitErrorDetails] = []
-        pending: list[tuple[Any, tuple[str | int, ...]]] = [(value, ())]
-        visited: set[int] = set()
-        while pending:
-            item, path = pending.pop()
-            if isinstance(item, float) and not isfinite(item):
-                errors.append({"type": "finite_number", "loc": path, "input": item})
-            elif isinstance(item, (dict, list, tuple)) and id(item) not in visited:
-                visited.add(id(item))
-                entries = item.items() if isinstance(item, dict) else enumerate(item)
-                pending.extend((nested, (*path, key)) for key, nested in entries)
-        if errors:
-            raise ValidationError.from_exception_data(cls.__name__, errors)
-        return value
-
-
-class Distance(StrEnum):
-    L2 = "l2"
-
-
-class Normalization(StrEnum):
-    NONE = "none"
-    UNIT = "unit"
-
-
-class EmbeddingProfile(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    profile_id: Annotated[StrictStr, Field(min_length=1, pattern=".*\\S.*")]
-    model: Annotated[StrictStr, Field(min_length=1, pattern=".*\\S.*")]
-    dimension: Annotated[StrictInt, Field(ge=1)]
-    distance: Distance = Distance.L2
-    normalization: Normalization = Normalization.UNIT
-
-
-class QueryVector(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    profile: EmbeddingProfile
-    vector: Annotated[list[StrictFloat], Field(min_length=1)]
-
-
-class TextItem(RootModel[StrictStr]):
-    root: Annotated[StrictStr, Field(min_length=1)]
-
-
-class VectorItem(RootModel[StrictStr]):
-    root: Annotated[StrictStr, Field(min_length=1)]
-
-
-class Indexes(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    text: Annotated[list[TextItem] | None, Field(min_length=1)] = None
-    vector: Annotated[list[VectorItem] | None, Field(min_length=1)] = None
-
-
-class SearchArtifactsRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    query: Annotated[StrictStr | None, Field(max_length=8192, min_length=1, pattern=".*\\S.*")] = None
-    query_vector: QueryVector | None = None
-    indexes: Indexes | None = None
-    limit: Annotated[StrictInt, Field(ge=1, le=200)] = 10
-    mode: Annotated[StrictStr | None, Field(min_length=1, pattern=".*\\S.*")] = None
-    filters: dict[str, Any] | None = None
-    admission: dict[str, Any] | None = None
-    fusion: ArtifactSearchFusion | None = None
-    min_score: Annotated[StrictFloat | None, Field(ge=0.0, le=1.0)] = None
-    include_scores: StrictBool = False
-    rerank: dict[str, Any] | None = None
-
-    @field_validator("query", mode="before")
-    @classmethod
-    def _trim_search_query(cls, value: Any) -> Any:
-        return value.strip() if isinstance(value, str) else value
-
-    @field_validator("*", mode="after")
-    @classmethod
-    def _reject_invalid_search_value(cls, value: Any) -> Any:
-        from math import isfinite
-
-        from pydantic import ValidationError
-        from pydantic_core import InitErrorDetails
-
-        if value is None:
-            raise ValueError("omit the field instead of sending null")  # noqa: TRY003
-        errors: list[InitErrorDetails] = []
-        pending: list[tuple[Any, tuple[str | int, ...]]] = [(value, ())]
-        visited: set[int] = set()
-        while pending:
-            item, path = pending.pop()
-            if isinstance(item, float) and not isfinite(item):
-                errors.append({"type": "finite_number", "loc": path, "input": item})
-            elif isinstance(item, (dict, list, tuple)) and id(item) not in visited:
-                visited.add(id(item))
-                entries = item.items() if isinstance(item, dict) else enumerate(item)
-                pending.extend((nested, (*path, key)) for key, nested in entries)
-        if errors:
-            raise ValidationError.from_exception_data(cls.__name__, errors)
-        return value
-
-
-class ArtifactChannelScore(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    raw: StrictFloat
-    metric: Annotated[StrictStr, Field(min_length=1, pattern=".*\\S.*")]
-    higher_is_better: StrictBool
-
-    @field_validator("*", mode="after")
-    @classmethod
-    def _reject_invalid_search_value(cls, value: Any) -> Any:
-        from math import isfinite
-
-        from pydantic import ValidationError
-        from pydantic_core import InitErrorDetails
-
-        if value is None:
-            raise ValueError("omit the field instead of sending null")  # noqa: TRY003
-        errors: list[InitErrorDetails] = []
-        pending: list[tuple[Any, tuple[str | int, ...]]] = [(value, ())]
-        visited: set[int] = set()
-        while pending:
-            item, path = pending.pop()
-            if isinstance(item, float) and not isfinite(item):
-                errors.append({"type": "finite_number", "loc": path, "input": item})
-            elif isinstance(item, (dict, list, tuple)) and id(item) not in visited:
-                visited.add(id(item))
-                entries = item.items() if isinstance(item, dict) else enumerate(item)
-                pending.extend((nested, (*path, key)) for key, nested in entries)
-        if errors:
-            raise ValidationError.from_exception_data(cls.__name__, errors)
-        return value
-
-
-class ArtifactSearchScores(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    retrieval: Annotated[StrictFloat, Field(ge=0.0, le=1.0)]
-    channels: dict[str, ArtifactChannelScore]
-
-    @field_validator("*", mode="after")
-    @classmethod
-    def _reject_invalid_search_value(cls, value: Any) -> Any:
-        from math import isfinite
-
-        from pydantic import ValidationError
-        from pydantic_core import InitErrorDetails
-
-        if value is None:
-            raise ValueError("omit the field instead of sending null")  # noqa: TRY003
-        errors: list[InitErrorDetails] = []
-        pending: list[tuple[Any, tuple[str | int, ...]]] = [(value, ())]
-        visited: set[int] = set()
-        while pending:
-            item, path = pending.pop()
-            if isinstance(item, float) and not isfinite(item):
-                errors.append({"type": "finite_number", "loc": path, "input": item})
-            elif isinstance(item, (dict, list, tuple)) and id(item) not in visited:
-                visited.add(id(item))
-                entries = item.items() if isinstance(item, dict) else enumerate(item)
-                pending.extend((nested, (*path, key)) for key, nested in entries)
-        if errors:
-            raise ValidationError.from_exception_data(cls.__name__, errors)
-        return value
-
-
-class Format(StrEnum):
-    MARKDOWN = "markdown"
-    TEXT = "text"
-
-
-class ArtifactRendering(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    family: Annotated[StrictStr, Field(min_length=1)]
-    artifact_id: Annotated[StrictStr, Field(max_length=128, min_length=1)]
-    revision: Annotated[StrictInt, Field(ge=1)]
-    format: Format
-    text: StrictStr
-
-
-class ArtifactSearchItem(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    family: Annotated[StrictStr, Field(min_length=1)]
-    artifact_id: Annotated[StrictStr, Field(max_length=128, min_length=1)]
-    revision: Annotated[StrictInt, Field(ge=1)]
-    content: dict[str, Any]
-    lineage: dict[str, Any]
-    scores: ArtifactSearchScores | None = None
-
-
-class SearchArtifactsResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    results: list[ArtifactSearchItem]
 
 
 class SearchTopicMemoryRequest(BaseModel):
@@ -3152,7 +1821,7 @@ class TopicMemoryWriteContent(BaseModel):
     detail: Annotated[StrictStr, Field(max_length=125000, min_length=1, pattern=".*\\S.*")]
 
 
-class Family2(StrEnum):
+class Family1(StrEnum):
     TOPIC_MEMORY = "topic-memory"
 
 
@@ -3169,27 +1838,25 @@ class ReplaceTopicMemoryArtifactRequest(BaseModel):
         extra="forbid",
     )
     content: TopicMemoryWriteContent
-    restored_from_revision: Annotated[StrictInt | None, Field(ge=1)] = None
-    reason: Annotated[StrictStr | None, Field(max_length=1024, min_length=1, pattern=".*\\S.*")] = None
 
 
-class Family3(StrEnum):
+class Family2(StrEnum):
     PROMPT = "prompt"
 
 
-class Family4(StrEnum):
+class Family3(StrEnum):
     MEMORY = "memory"
 
 
-class Family5(StrEnum):
+class Family4(StrEnum):
     EXPERIENCE = "experience"
 
 
-class Family6(StrEnum):
+class Family5(StrEnum):
     SKILL = "skill"
 
 
-class Family7(StrEnum):
+class Family6(StrEnum):
     HANDOFF = "handoff"
 
 
@@ -3221,33 +1888,23 @@ class CreateSourceRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    source_type: Annotated[
-        StrictStr,
-        Field(
-            description="The built-in content type, or a Source type that a loaded plugin defines. A plugin type's content is that type's input; the plugin resolves it into the stored Source.",
-            max_length=128,
-            min_length=1,
-            pattern="^[a-z][a-z0-9._-]*$",
-        ),
-    ] = "content"
+    source_type: SourceType = SourceType.CONTENT
     content: Annotated[
         Any,
         Field(
-            description="JSON value persisted by the built-in content Source adapter, or the input of a plugin Source type. Server-reserved payload schemas, including handoff receipts, are rejected and must be created through their dedicated workflow. String values that are empty or whitespace-only are rejected."
+            description="JSON value persisted by the built-in content Source adapter. Server-reserved payload schemas, including handoff receipts, are rejected and must be created through their dedicated workflow."
         ),
     ]
 
 
-class TaggableArtifactFamily(RootModel[StrictStr]):
-    root: Annotated[
-        StrictStr,
-        Field(
-            description="A built-in Family or a loaded plugin family; every readable Family supports logical tags on persisted Artifacts. The collection-level memory Family tags entries instead.",
-            max_length=128,
-            min_length=1,
-            pattern="^[a-z][a-z0-9-]*$",
-        ),
-    ]
+class TaggableArtifactFamily(StrEnum):
+    MEMORY = "memory"
+    EXPERIENCE = "experience"
+    SKILL = "skill"
+    HANDOFF = "handoff"
+    PROFILE = "profile"
+    PROMPT = "prompt"
+    TOPIC_MEMORY = "topic-memory"
 
 
 class TagMatch(StrEnum):
@@ -3277,7 +1934,7 @@ class Type1(StrEnum):
     MEMORY_ENTRY = "memory_entry"
 
 
-class Family8(StrEnum):
+class Family7(StrEnum):
     MEMORY = "memory"
 
 
@@ -3286,7 +1943,7 @@ class MemoryEntryTagTarget(BaseModel):
         extra="forbid",
     )
     type: Literal["memory_entry"]
-    family: Family8
+    family: Family7
     artifact_id: Annotated[StrictStr, Field(max_length=128, min_length=1)]
     entry_id: Annotated[StrictStr, Field(max_length=128, min_length=1)]
 
@@ -3295,7 +1952,7 @@ class TagTarget(RootModel[ArtifactTagTarget | MemoryEntryTagTarget]):
     root: Annotated[ArtifactTagTarget | MemoryEntryTagTarget, Field(discriminator="type")]
 
 
-class Tag3(RootModel[StrictStr]):
+class Tag(RootModel[StrictStr]):
     root: Annotated[StrictStr, Field(max_length=64, min_length=1)]
 
 
@@ -3303,7 +1960,7 @@ class TagFilter(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    tags: Annotated[list[Tag3], Field(max_length=16, min_length=1)]
+    tags: Annotated[list[Tag], Field(max_length=16, min_length=1)]
     match: TagMatch = TagMatch.ALL
 
 
@@ -3311,14 +1968,14 @@ class ReplaceArtifactTagsRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    tags: Annotated[list[Tag3], Field(max_length=32, min_length=0)]
+    tags: Annotated[list[Tag], Field(max_length=32, min_length=0)]
 
 
 class QueryArtifactTagsRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    tags: Annotated[list[Tag3], Field(max_length=16, min_length=1)]
+    tags: Annotated[list[Tag], Field(max_length=16, min_length=1)]
     match: TagMatch = TagMatch.ALL
     families: Annotated[
         list[TaggableArtifactFamily] | None,
@@ -3340,7 +1997,7 @@ class ArtifactTagSet(BaseModel):
     )
     scope_id: StrictStr
     target: TagTarget
-    tags: Annotated[list[Tag3], Field(max_length=32, min_length=0)]
+    tags: Annotated[list[Tag], Field(max_length=32, min_length=0)]
     tag_digest: Annotated[
         StrictStr,
         Field(
@@ -3356,7 +2013,7 @@ class TaggedTarget(BaseModel):
     )
     scope_id: StrictStr
     target: TagTarget
-    tags: Annotated[list[Tag3], Field(max_length=32, min_length=0)]
+    tags: Annotated[list[Tag], Field(max_length=32, min_length=0)]
     tag_digest: Annotated[
         StrictStr,
         Field(
@@ -3364,7 +2021,7 @@ class TaggedTarget(BaseModel):
             pattern="^sha256:[0-9a-f]{64}$",
         ),
     ]
-    reference: ArtifactReference
+    reference: ArtifactReference | MemoryCitation
 
 
 class ArtifactTagPage(BaseModel):
@@ -3387,13 +2044,6 @@ class ListArtifactsRequest(BaseModel):
     tag_match: TagMatch | None = None
     limit: Annotated[StrictInt, Field(ge=1, le=100)] = 50
     cursor: Annotated[StrictStr | None, Field(max_length=4096, min_length=1)] = None
-
-
-class GetArtifactRenderingRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    revision: Annotated[StrictInt | None, Field(ge=1)] = None
 
 
 class ListArtifactRevisionsRequest(BaseModel):
@@ -3429,8 +2079,6 @@ class ListSourcesRequest(BaseModel):
 class PromptKey(StrEnum):
     MEMORY_EXTRACT = "memory.extract"
     MEMORY_RERANK = "memory.rerank"
-    ATOMIC_MEMORY_EXTRACT = "atomic_memory.extract"
-    ATOMIC_MEMORY_RECONCILE = "atomic_memory.reconcile"
     EXPERIENCE_INCUBATE = "experience.incubate"
     EXPERIENCE_GENERATE = "experience.generate"
     SKILL_GENERATE = "skill.generate"
@@ -3449,7 +2097,7 @@ class SchemaVersion(StrEnum):
     POWERCONTEXT_PROMPT_V1 = "powercontext.prompt.v1"
 
 
-class Mode4(StrEnum):
+class Mode3(StrEnum):
     AUTO = "auto"
     CUSTOM = "custom"
 
@@ -3462,20 +2110,20 @@ class PromptDemonstration(BaseModel):
     expected_output: Annotated[Any, Field(description="Desired JSON output matching the registered Prompt Definition.")]
 
 
-class Status4(StrEnum):
+class Status3(StrEnum):
     SUPPORTED = "supported"
     DISABLED = "disabled"
     UNSUPPORTED = "unsupported"
 
 
-class Reason1Enum(StrEnum):
+class ReasonEnum(StrEnum):
     OPERATION_DISABLED = "operation_disabled"
     PROVIDER_NOT_CONFIGURED = "provider_not_configured"
     INJECTED_COMPONENT = "injected_component"
 
 
-class Reason1(RootModel[Reason1Enum | None]):
-    root: Reason1Enum | None = None
+class Reason(RootModel[ReasonEnum | None]):
+    root: ReasonEnum | None = None
 
 
 class BuiltinProfileEnum(StrEnum):
@@ -3491,8 +2139,8 @@ class PromptCapability(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    status: Status4
-    reason: Annotated[Reason1 | None, Field(...)]
+    status: Status3
+    reason: Annotated[Reason | None, Field(...)]
     definition_version: StrictStr
     builtin_version: StrictStr
     builtin_profile: Annotated[BuiltinProfile | None, Field(...)]
@@ -3508,13 +2156,13 @@ class PromptInstructions(BaseModel):
     demonstrations: list[PromptDemonstration]
 
 
-class Profile1Enum(StrEnum):
+class ProfileEnum(StrEnum):
     CODING = "coding"
     CONVERSATION = "conversation"
 
 
-class Profile1(RootModel[Profile1Enum | None]):
-    root: Profile1Enum | None = None
+class Profile(RootModel[ProfileEnum | None]):
+    root: ProfileEnum | None = None
 
 
 class BuiltinPromptInstructions(BaseModel):
@@ -3522,20 +2170,20 @@ class BuiltinPromptInstructions(BaseModel):
         extra="forbid",
     )
     version: StrictStr
-    profile: Annotated[Profile1 | None, Field(...)]
+    profile: Annotated[Profile | None, Field(...)]
     instructions: Annotated[
         StrictStr, Field(description="Exact default instructions from the active Runtime Prompt Definition.")
     ]
 
 
-class Reason2Enum(StrEnum):
+class Reason1Enum(StrEnum):
     OPERATION_DISABLED = "operation_disabled"
     PROVIDER_NOT_CONFIGURED = "provider_not_configured"
     INJECTED_COMPONENT = "injected_component"
 
 
-class Reason2(RootModel[Reason2Enum | None]):
-    root: Reason2Enum | None = None
+class Reason1(RootModel[Reason1Enum | None]):
+    root: Reason1Enum | None = None
 
 
 class PromptConfiguration(BaseModel):
@@ -3544,9 +2192,9 @@ class PromptConfiguration(BaseModel):
     )
     scope_id: StrictStr
     prompt_key: PromptKey
-    status: Status4
-    reason: Annotated[Reason2 | None, Field(...)]
-    mode: Mode4
+    status: Status3
+    reason: Annotated[Reason1 | None, Field(...)]
+    mode: Mode3
     artifact: Annotated[ArtifactReference | None, Field(...)]
     artifact_etag: Annotated[
         StrictStr | None,
@@ -3597,49 +2245,6 @@ class ReplaceMemoryArtifactEntry(BaseModel):
     text: Annotated[StrictStr, Field(max_length=8192, min_length=1, pattern=".*\\S.*")]
 
 
-class Kind10(StrEnum):
-    SEQUENCE = "sequence"
-
-
-class SourceSequenceLocator(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    kind: Literal["sequence"]
-    sequence: Annotated[StrictInt, Field(ge=0)]
-
-
-class Kind11(StrEnum):
-    LINE_RANGE = "line_range"
-
-
-class SourceLineRangeLocator(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    kind: Literal["line_range"]
-    start_line: Annotated[StrictInt, Field(ge=1)]
-    end_line: Annotated[StrictInt, Field(ge=1)]
-    heading_path: Annotated[
-        StrictStr | None,
-        Field(
-            description="Optional adapter-supplied heading path, bounded in Unicode characters rather than UTF-8 bytes.",
-            max_length=1024,
-        ),
-    ] = Field(default=None, exclude_if=lambda value: value is None)
-
-    @model_validator(mode="after")
-    def _validate_source_line_range(self):
-        from powercontext.sources import SourceLineRangeLocator
-
-        SourceLineRangeLocator.model_validate(self.model_dump(mode="json"))
-        return self
-
-
-class SourceLocator(RootModel[SourceSequenceLocator | SourceLineRangeLocator]):
-    root: Annotated[SourceSequenceLocator | SourceLineRangeLocator, Field(discriminator="kind")]
-
-
 class SourceTypeReference(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -3655,7 +2260,6 @@ class SourceTypeReference(BaseModel):
             min_length=1,
         ),
     ]
-    locator: SourceLocator | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class SourceReference(BaseModel):
@@ -3664,7 +2268,6 @@ class SourceReference(BaseModel):
     )
     name: Annotated[StrictStr, Field(description="Stable Source type.")]
     source_id: StrictStr
-    locator: SourceLocator | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class CaptureStatus(StrEnum):
@@ -3673,7 +2276,6 @@ class CaptureStatus(StrEnum):
 
 class BaseArtifactFamily(StrEnum):
     MEMORY = "memory"
-    ATOMIC_MEMORY = "atomic-memory"
     EXPERIENCE = "experience"
     SKILL = "skill"
     HANDOFF = "handoff"
@@ -3682,8 +2284,14 @@ class BaseArtifactFamily(StrEnum):
     TOPIC_MEMORY = "topic-memory"
 
 
-class ArtifactReadFamily(RootModel[StrictStr]):
-    root: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[a-z][a-z0-9-]*$")]
+class ArtifactReadFamily(StrEnum):
+    MEMORY = "memory"
+    EXPERIENCE = "experience"
+    SKILL = "skill"
+    HANDOFF = "handoff"
+    PROFILE = "profile"
+    PROMPT = "prompt"
+    TOPIC_MEMORY = "topic-memory"
 
 
 class StatsPeriod(StrEnum):
@@ -3696,10 +2304,6 @@ class CandidateFamily(StrEnum):
     EXPERIENCE = "experience"
     SKILL = "skill"
     PROFILE = "profile"
-    ATOMIC_MEMORY = "atomic-memory"
-    TOPIC_MEMORY = "topic-memory"
-    HANDOFF = "handoff"
-    PROMPT = "prompt"
 
 
 class ExternalSkillInstallationScope(StrEnum):
@@ -3726,48 +2330,6 @@ class PreparedContextSchema(StrEnum):
 class PreparedContextStatus(StrEnum):
     READY = "ready"
     EMPTY = "empty"
-
-
-class BootstrapContextSchema(StrEnum):
-    POWERCONTEXT_BOOTSTRAP_CONTEXT_V1 = "powercontext.bootstrap-context.v1"
-
-
-class BootstrapContextProfile(StrEnum):
-    POWERCONTEXT_SCOPE_BOOTSTRAP_V1 = "powercontext.scope-bootstrap.v1"
-
-
-class BootstrapContextLifecycle(StrEnum):
-    STARTUP = "startup"
-    RESUME = "resume"
-    CLEAR = "clear"
-    COMPACT = "compact"
-    RESTORE = "restore"
-    FORK = "fork"
-
-
-class BootstrapContextStatus(StrEnum):
-    READY = "ready"
-    EMPTY = "empty"
-    SKIPPED = "skipped"
-
-
-class BootstrapContextItemKind(StrEnum):
-    ATOMIC_MEMORY = "atomic-memory"
-    HANDOFF = "handoff"
-
-
-class BootstrapReceiptState(StrEnum):
-    PENDING = "pending"
-    INJECTED = "injected"
-    SKIPPED = "skipped"
-    FAILED = "failed"
-
-
-class BootstrapSkipReason(StrEnum):
-    DISABLED = "disabled"
-    NO_ELIGIBLE_CONTEXT = "no_eligible_context"
-    ALREADY_DELIVERED = "already_delivered"
-    PREPARATION_FAILED = "preparation_failed"
 
 
 class EntryChangeOperation(StrEnum):
@@ -3798,6 +2360,16 @@ class TopicMemoryMatchedBy(StrEnum):
 class TopicMemoryUsedSearchMode(StrEnum):
     FTS = "fts"
     HYBRID = "hybrid"
+
+
+class MemoryEntryState(StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
+class MemoryMatchedBy(StrEnum):
+    FTS = "fts"
+    VECTOR = "vector"
 
 
 class MemorySearchMode(StrEnum):
@@ -3837,15 +2409,6 @@ class HandoffEvidenceStatus(StrEnum):
 class HandoffResolutionStatus(StrEnum):
     EMPTY = "empty"
     RESOLVED = "resolved"
-
-
-class HandoffRolloverReason(StrEnum):
-    USER_REQUESTED = "user_requested"
-    HOST_CONTEXT_BUDGET = "host_context_budget"
-    HOST_COMPACTION = "host_compaction"
-    CONTEXT_QUALITY = "context_quality"
-    DELEGATION = "delegation"
-    MANUAL_CHECKPOINT = "manual_checkpoint"
 
 
 class HandoffSchema(StrEnum):
@@ -3915,21 +2478,6 @@ class ShareUnit(StrEnum):
     MEMORY_ENTRY = "memory_entry"
 
 
-class ConnectionAuthentication(StrEnum):
-    DISABLED = "disabled"
-    AUTHENTICATED = "authenticated"
-
-
-class ConnectionIdentity(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    server_id: Annotated[StrictStr, Field(max_length=128, min_length=1)]
-    authentication: ConnectionAuthentication
-    access_mode: AccessControlMode
-    principal: Annotated[AccessPrincipal | None, Field(...)]
-
-
 class AccessAction(StrEnum):
     SERVER_OBSERVE = "server.observe"
     SERVER_ADMIN = "server.admin"
@@ -3938,7 +2486,6 @@ class AccessAction(StrEnum):
     SCOPE_REVIEW = "scope.review"
     SCOPE_DELEGATE = "scope.delegate"
     SCOPE_ADMIN = "scope.admin"
-    GATEWAY_INVOKE = "gateway.invoke"
     ARTIFACT_READ = "artifact.read"
     ARTIFACT_WRITE = "artifact.write"
     ARTIFACT_SHARE = "artifact.share"
@@ -4083,7 +2630,6 @@ class AccessRole(StrEnum):
     SCOPE_REVIEWER = "scope.reviewer"
     SCOPE_DELEGATOR = "scope.delegator"
     SCOPE_ADMIN = "scope.admin"
-    GATEWAY_USER = "gateway.user"
     SERVER_OBSERVER = "server.observer"
     SERVER_ADMIN = "server.admin"
 
@@ -4270,693 +2816,6 @@ class AccessAuditPage(BaseModel):
     next_cursor: Annotated[StrictStr | None, Field(max_length=2048)]
 
 
-class TagDreamTarget(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    target: TagTarget
-    expected_etag: Annotated[StrictStr, Field(min_length=1)]
-    basis_ref: ArtifactReference
-
-
-class CandidateAudit(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    origin: Annotated[StrictStr, Field(min_length=1)]
-    operation: Annotated[StrictStr, Field(min_length=1)]
-    dream_run_id: Annotated[StrictStr, Field(min_length=1)]
-    spec_version: Annotated[StrictStr, Field(min_length=1)]
-    proposal_digest: Annotated[StrictStr, Field(min_length=1)]
-    evidence_manifest_ref: Annotated[StrictStr, Field(min_length=1)]
-    validation_policy_digest: Annotated[StrictStr, Field(min_length=1)]
-    proposal_fingerprint: Annotated[StrictStr | None, Field(...)]
-
-
-class BeforeTag(RootModel[StrictStr]):
-    root: Annotated[StrictStr, Field(max_length=64, min_length=1)]
-
-
-class AfterTag(RootModel[StrictStr]):
-    root: Annotated[StrictStr, Field(max_length=64, min_length=1)]
-
-
-class CatalogChangeProposal(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    target: TagTarget
-    expected_etag: Annotated[StrictStr, Field(min_length=1)]
-    basis_ref: ArtifactReference
-    before_tags: Annotated[list[BeforeTag], Field(max_length=32)]
-    after_tags: Annotated[list[AfterTag], Field(max_length=32)]
-
-
-class CatalogTagResult(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(min_length=1)]
-    target: TagTarget
-    tags: Annotated[list[Tag3], Field(max_length=32)]
-    tag_digest: Annotated[StrictStr, Field(min_length=1)]
-    etag: Annotated[StrictStr, Field(min_length=1)]
-
-
-class SourceCapabilityQuery(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    capability: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    instance_id: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    input: dict[str, Any] | None = None
-
-
-class SourceWritePluginLoadRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    id: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")]
-    entry: Annotated[StrictStr, Field(max_length=4096, min_length=1)]
-
-
-class SourceWritePluginState(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    id: StrictStr
-    entry: StrictStr
-    capabilities: list[dict[str, Any]]
-
-
-class SourceAddRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    capability: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    capability_version: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    instance_id: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    input: dict[str, Any]
-
-
-class View(StrEnum):
-    RESULT = "result"
-    CONTROL = "control"
-
-
-class SourceStatusRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    target_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    view: View = View.RESULT
-
-
-class SourceInstanceSetEnabledRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    instance_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    enabled: StrictBool
-
-
-class SourceConfigureRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    update: StrictBool = False
-    registration: dict[str, Any]
-
-
-class Management(StrEnum):
-    NOT_CONFIGURED = "not-configured"
-    ONLINE = "online"
-    UNAVAILABLE = "unavailable"
-
-
-class SourceCapabilityResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    capabilities: list[dict[str, Any]]
-    management: Management
-
-
-class SourceInstancesResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    instances: list[dict[str, Any]]
-    capabilities: list[dict[str, Any]] | None = None
-    management: Management | None = None
-
-
-class Outcome5(StrEnum):
-    SAVED = "saved"
-    UNCHANGED = "unchanged"
-
-
-class SourceCollectionResult(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    outcome: Outcome5
-    source_refs: list[SourceTypeReference]
-
-
-class Tracking(StrEnum):
-    ENABLED = "enabled"
-    STOPPING = "stopping"
-    STOPPED = "stopped"
-
-
-class Availability(StrEnum):
-    ONLINE = "online"
-    OFFLINE = "offline"
-    UNAVAILABLE = "unavailable"
-
-
-class Kind12(StrEnum):
-    COLLECT = "collect"
-    WRITE = "write"
-
-
-class SourceManagementReceipt(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    target_id: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    tracking: Tracking | None = None
-    result: SourceCollectionResult | None = None
-    error: StrictStr | None = None
-    instance_id: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    capability: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    capability_version: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    availability: Availability | None = None
-    updated_at: StrictStr | None = None
-    kind: Kind12 | None = None
-    enabled: StrictBool | None = None
-    source_refs: Annotated[
-        list[SourceTypeReference] | None,
-        Field(
-            description="Default collect status only. The single Source reference from the submission report most recently received by the manager, or empty before any report. Omitted from collect add responses; not a batch result or submission history.",
-            max_length=1,
-        ),
-    ] = None
-    last_submitted_at: Annotated[
-        StrictStr | None,
-        Field(
-            description="Default collect status only. Runtime-reported submission time paired with source_refs, or null before any report. Selection follows manager receipt order, not timestamp order. Omitted from collect add responses."
-        ),
-    ] = None
-
-
-class SourceInstanceStatus(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    targets_initialized: StrictBool | None = None
-    target_id: StrictStr | None = None
-    instance_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    enabled: StrictBool | None = None
-    actual: StrictStr | None = None
-    run_id: StrictStr | None = None
-    availability: StrictStr | None = None
-    reused: StrictBool | None = None
-
-
-class SourceChannelOpen(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    protocol: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    deployment_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    manager_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-
-
-class SourceChannelRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    generation: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    message_id: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    response: dict[str, Any] | None = None
-    catalog: dict[str, Any] | None = None
-
-
-class SourceChannelResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    generation: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    protocol: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    confirmed: StrictBool | None = None
-    messages: list[dict[str, Any]] | None = None
-
-
-class Status6(StrEnum):
-    RUNNING = "running"
-    COMPLETE = "complete"
-    COMPLETED = "completed"
-    PENDING = "pending"
-    FAILED = "failed"
-    STOPPED = "stopped"
-    CLEANUP_FAILED = "cleanup-failed"
-
-
-class SourceInstanceExchangeRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    generation: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    protocol: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    message_id: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    execution_location: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    configuration_digest: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    run_id: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    execution: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    target_id: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    capabilities: Annotated[list[dict[str, Any]] | None, Field(max_length=64)] = None
-    response: dict[str, Any] | None = None
-    owner: dict[str, Any] | None = None
-    status: Status6 | None = None
-    source_refs: Annotated[
-        list[SourceTypeReference] | None,
-        Field(
-            description="One confirmed Source submission reported by the Runtime; not a batch or historical reference list.",
-            max_length=1,
-            min_length=1,
-        ),
-    ] = None
-    error: Annotated[StrictStr | None, Field(max_length=1024)] = None
-    targets: Annotated[list[dict[str, Any]] | None, Field(max_length=256)] = None
-    cursor: Annotated[StrictStr | None, Field(max_length=256)] = None
-    owner_exited: StrictBool | None = None
-    previous_owner: dict[str, Any] | None = None
-    submitted_at: StrictStr | None = None
-
-
-class SourceInstanceExchangeResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="allow",
-    )
-
-
-class SourceTargetSetEnabledRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    target_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    enabled: StrictBool
-
-
-class View1(StrEnum):
-    DISCOVERY = "discovery"
-    CONTROL = "control"
-
-
-class SourceInstancesQuery(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    capability: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    instance_id: Annotated[StrictStr | None, Field(max_length=256, min_length=1)] = None
-    input: dict[str, Any] | None = None
-    view: View1 = View1.DISCOVERY
-
-
-class ScopeId1(RootModel[StrictStr]):
-    root: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-
-
-class PlanAccessOwnershipRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_ids: Annotated[
-        list[ScopeId1] | None,
-        Field(
-            description="Scopes to inspect; every Scope when omitted. Pass Scopes incrementally for large deployments.",
-            min_length=1,
-        ),
-    ] = None
-    background_principal: Annotated[
-        AccessPrincipal | None,
-        Field(
-            description="Optional background processing Principal, such as ACCESS_BACKGROUND_PRINCIPAL_ID; each selected Scope is checked for scope.contribute and write permission on an existing Profile, including after all ownership gaps have been filled. An available Access store is required."
-        ),
-    ] = None
-
-
-class OwnershipGapKind(StrEnum):
-    ARTIFACT_OWNER = "artifact_owner"
-    CANDIDATE_ATTESTATION = "candidate_attestation"
-
-
-class OwnershipGapItem(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    kind: OwnershipGapKind
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    family: Annotated[StrictStr, Field(max_length=128, min_length=1)]
-    artifact_id: Annotated[StrictStr | None, Field(max_length=256)] = None
-    entry_id: Annotated[StrictStr | None, Field(max_length=256)] = None
-    candidate_id: Annotated[StrictStr | None, Field(max_length=128)] = None
-    version: Annotated[StrictInt | None, Field(ge=1)] = None
-    conflict_code: Annotated[StrictStr | None, Field(max_length=64)] = None
-
-
-class AccessOwnershipScopePlan(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    artifact_gaps: list[OwnershipGapItem]
-    candidate_gaps: list[OwnershipGapItem]
-
-
-class Allowed(Enum):
-    BOOLEAN_FALSE = False
-
-
-class BackgroundPermissionGap(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    principal_id: Annotated[StrictStr, Field(max_length=255, min_length=1)]
-    allowed: Allowed
-    reason_code: Annotated[StrictStr | None, Field(max_length=64)]
-
-
-class AccessOwnershipPlan(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    mode: AccessControlMode
-    scopes: list[AccessOwnershipScopePlan]
-    background: list[BackgroundPermissionGap]
-
-
-class ApplyAccessOwnershipRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    owner: AccessPrincipal
-    scope_ids: Annotated[
-        list[ScopeId1] | None,
-        Field(
-            description="Scopes to migrate; every Scope when omitted. Pass Scopes incrementally for large deployments.",
-            min_length=1,
-        ),
-    ] = None
-    dry_run: StrictBool = False
-
-
-class AccessOwnershipApplyResult(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    dry_run: StrictBool
-    applied: list[OwnershipGapItem]
-    conflicts: list[OwnershipGapItem]
-
-
-class RecallManifestRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    kind: Annotated[StrictStr | None, Field(min_length=1)] = None
-    tags: Annotated[list[Tag] | None, Field(max_length=16)] = None
-    tag_match: TagMatch | None = None
-    limit: Annotated[StrictInt, Field(ge=1, le=100)] = 50
-    cursor: Annotated[StrictStr | None, Field(max_length=4096)] = None
-
-
-class RecallManifestEntry(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    ref: ArtifactReference
-    kind: StrictStr
-    description: Annotated[
-        StrictStr | None,
-        Field(
-            description="Stored summary, or null for historical records awaiting explicit summary completion. No body is read to synthesize it.",
-            max_length=200,
-            min_length=1,
-            pattern="^[^\\r\\n\\u0085\\u2028\\u2029]*\\S[^\\r\\n\\u0085\\u2028\\u2029]*$",
-        ),
-    ]
-    state_version: Annotated[StrictInt, Field(ge=0)]
-
-
-class RecallManifestResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    items: Annotated[list[RecallManifestEntry], Field(max_length=100)]
-    next_cursor: Annotated[StrictStr | None, Field(...)]
-    code: Code
-
-
-class AtomicMemoryReadContent(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Annotated[AtomicMemoryContentSchema, Field(alias="schema")] = (
-        AtomicMemoryContentSchema.POWERCONTEXT_ATOMIC_MEMORY_V1
-    )
-    kind: Annotated[StrictStr, Field(max_length=128, min_length=1)]
-    text: Annotated[
-        StrictStr,
-        Field(
-            description="Memory text is NFC-normalized and trimmed before enforcing an 8192 UTF-8 byte limit.",
-            min_length=1,
-        ),
-    ]
-    description: Annotated[
-        StrictStr | None,
-        Field(
-            description="A concise single-line summary of final text, in the same language. Required for new writes.",
-            max_length=200,
-            min_length=1,
-            pattern="^[^\\r\\n\\u0085\\u2028\\u2029]*\\S[^\\r\\n\\u0085\\u2028\\u2029]*$",
-        ),
-    ] = None
-
-
-class AtomicMemoryWriteContent(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Annotated[AtomicMemoryContentSchema, Field(alias="schema")] = (
-        AtomicMemoryContentSchema.POWERCONTEXT_ATOMIC_MEMORY_V1
-    )
-    kind: Annotated[StrictStr, Field(max_length=128, min_length=1)]
-    text: Annotated[
-        StrictStr,
-        Field(
-            description="Memory text is NFC-normalized and trimmed before enforcing an 8192 UTF-8 byte limit.",
-            min_length=1,
-        ),
-    ]
-    description: Annotated[
-        StrictStr | None,
-        Field(
-            description="Optional supplied single-line summary. When omitted, the Server stores a whitespace-collapsed text prefix of at most 200 Unicode characters, including a trailing ellipsis when truncated. Explicit writes do not invoke a generation model.",
-            max_length=200,
-            min_length=1,
-            pattern="^[^\\r\\n\\u0085\\u2028\\u2029]*\\S[^\\r\\n\\u0085\\u2028\\u2029]*$",
-        ),
-    ] = None
-
-
-class CreateAtomicMemoryArtifactRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    family: Literal["atomic-memory"]
-    content: AtomicMemoryWriteContent
-
-
-class ReplaceAtomicMemoryArtifactRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    content: AtomicMemoryWriteContent
-
-
-class AtomicMemoryStateResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    artifact: ArtifactReference
-    state: AtomicMemoryState
-    state_version: Annotated[StrictInt, Field(ge=0)]
-    merged_into_id: Annotated[StrictStr | None, Field(...)]
-
-
-class AtomicMemoryRecord(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    artifact: ArtifactReference
-    kind: Annotated[StrictStr, Field(min_length=1)]
-    text: Annotated[StrictStr, Field(min_length=1)]
-    state: AtomicMemoryState
-    state_version: Annotated[StrictInt, Field(ge=0)]
-    merged_into_id: Annotated[StrictStr | None, Field(...)]
-
-
-class AtomicMemoryInput(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    artifact: ArtifactReference
-    state_version: Annotated[StrictInt, Field(ge=0)]
-
-
-class ListAtomicMemoryRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    states: list[AtomicMemoryState] | None = None
-    kind: Annotated[StrictStr | None, Field(min_length=1)] = None
-    tags: Annotated[list[Tag] | None, Field(max_length=16)] = None
-    tag_match: TagMatch | None = None
-    limit: Annotated[StrictInt, Field(ge=1, le=100)] = 50
-    cursor: Annotated[StrictStr | None, Field(max_length=4096)] = None
-
-
-class ListAtomicMemoryResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    items: list[AtomicMemoryRecord]
-    next_cursor: Annotated[StrictStr | None, Field(...)]
-
-
-class SearchAtomicMemoryRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    query: Annotated[StrictStr, Field(max_length=8192, min_length=1)]
-    mode: AtomicMemorySearchMode = AtomicMemorySearchMode.TEXT
-    kind: Annotated[StrictStr | None, Field(min_length=1)] = None
-    tags: Annotated[list[Tag] | None, Field(max_length=16)] = None
-    tag_match: TagMatch | None = None
-    limit: Annotated[StrictInt, Field(ge=1, le=100)] = 20
-
-
-class AtomicMemorySearchHit(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    memory: AtomicMemoryRecord
-    score: Annotated[
-        StrictFloat,
-        Field(
-            description="Raw RRF score. Hybrid mode applies the deployment's normalized relative FTS/vector weights."
-        ),
-    ]
-    matched_by: list[MatchedByEnum]
-
-
-class SearchAtomicMemoryResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    mode: AtomicMemorySearchMode
-    hits: list[AtomicMemorySearchHit]
-
-
-class MergeAtomicMemoryRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    inputs: Annotated[list[AtomicMemoryInput], Field(min_length=2)]
-    content: AtomicMemoryWriteContent
-    source_refs: list[SourceReference] | None = None
-    artifact_refs: list[ArtifactReference] | None = None
-
-
-class AtomicMemoryMutationResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    changed: StrictBool
-    records: list[AtomicMemoryRecord]
-
-
-class AtomicMemoryLifecycleRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    target: AtomicMemoryInput
-    state: AtomicMemoryLifecycleState
-
-
-class AtomicMemoryRestorationRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    target: AtomicMemoryTarget
-    operation: AtomicMemoryRestorationOperation = AtomicMemoryRestorationOperation.RESTORE
-    preview_token: StrictStr | None = None
-
-
-class AtomicMemoryRestorationPreviewRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    target: AtomicMemoryTarget
-    operation: AtomicMemoryRestorationOperation = AtomicMemoryRestorationOperation.RESTORE
-
-
-class AtomicMemoryRestorationPreview(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    preview_token: Annotated[StrictStr, Field(min_length=1)]
-    expires_at: AwareDatetime
-    endpoint: AtomicMemoryRestorationEndpoint
-    restore: list[AtomicMemoryRestorationItem]
-    retire: list[ArtifactReference]
-    undo_merge_results: list[UndoMergeResult]
-
-
-class AtomicMemoryRestorationResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    changed: StrictBool
-    restored: list[ArtifactReference]
-    retired: list[ArtifactReference]
-    undo_merge_results: list[UndoMergeResult]
-
-
-class LegacyMemoryTarget(RootModel[MemoryEntryTagTarget]):
-    root: MemoryEntryTagTarget
-
-
-class GetMemoryEntryResponse(RootModel[AtomicMemoryRecord]):
-    root: AtomicMemoryRecord
-
-
 class FlushProfileResponse(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -4972,7 +2831,7 @@ class FlushProfileResponse(BaseModel):
 
 class ArtifactCollectionItem(BaseModel):
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    family: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[a-z][a-z0-9-]*$")]
+    family: ArtifactReadFamily
     artifact_id: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
     revision: Annotated[StrictInt, Field(ge=1)]
     sources: list[SourceTypeReference]
@@ -4986,15 +2845,11 @@ class ArtifactCollectionItem(BaseModel):
     source_count: Annotated[
         StrictInt | None, Field(description="Family-provided number of direct Source inputs when available.", ge=0)
     ] = None
-    created_at: AwareDatetime | None = None
-    created_by: AccessPrincipal | None = None
-    restored_from_revision: Annotated[StrictInt | None, Field(ge=1)] = None
-    reason: Annotated[StrictStr | None, Field(max_length=1024)] = None
 
 
 class ArtifactCreated(BaseModel):
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    family: ArtifactReadFamily
+    family: BaseArtifactFamily
     artifact_id: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
     revision: Annotated[StrictInt, Field(ge=1)]
     sources: list[SourceTypeReference]
@@ -5016,24 +2871,14 @@ class ArtifactRevisionPage(BaseModel):
 
 class ArtifactRevision(BaseModel):
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    family: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[a-z][a-z0-9-]*$")]
+    family: ArtifactReadFamily
     artifact_id: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
     revision: Annotated[StrictInt, Field(ge=1)]
     content: dict[str, Any]
     sources: list[SourceTypeReference]
     artifacts: list[ArtifactReference]
+    memory_citations: Annotated[list[MemoryCitation], Field(validate_default=True)] = []
     content_digest: Annotated[StrictStr, Field(pattern="^sha256:[0-9a-f]{64}$")]
-    created_at: Annotated[
-        AwareDatetime | None,
-        Field(description="When this revision was committed. Absent for revisions stored before this field existed."),
-    ] = None
-    created_by: Annotated[
-        AccessPrincipal | None, Field(description="Principal that committed a rollback. Ordinary revisions omit it.")
-    ] = None
-    restored_from_revision: Annotated[
-        StrictInt | None, Field(description="Historical revision restored by this rollback.", ge=1)
-    ] = None
-    reason: Annotated[StrictStr | None, Field(description="Reason recorded for a rollback.", max_length=1024)] = None
 
 
 class HandoffReceiptIdentity(BaseModel):
@@ -5044,22 +2889,13 @@ class HandoffReceiptIdentity(BaseModel):
     receiver_identity_matches: StrictBool
 
 
-class DreamSourceReference(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    source_type: Annotated[StrictStr, Field(max_length=128, min_length=1)]
-    source_id: Annotated[StrictStr, Field(max_length=256, min_length=1)]
-    locator: SourceLocator | None = Field(default=None, exclude_if=lambda value: value is None)
-
-
 class CreateDreamRunRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    tag_target: TagDreamTarget | None = None
     operation: DreamOperation
     artifacts: Annotated[list[ArtifactReference], Field(validate_default=True)] = []
+    memory_citations: Annotated[list[MemoryCitation], Field(validate_default=True)] = []
     sources: Annotated[list[DreamSourceReference], Field(validate_default=True)] = []
     target: ArtifactReference | None = None
     idempotency_key: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^\\S(?:[\\s\\S]*\\S)?$")]
@@ -5074,59 +2910,38 @@ class DreamEvidenceNode(BaseModel):
     digest: StrictStr
     source: DreamSourceReference | None = None
     artifact: ArtifactReference | None = None
+    memory_citations: Annotated[list[MemoryCitation], Field(validate_default=True)] = []
     role: DreamEvidenceRole
     historical: StrictBool = False
+    current_entry_version_id: StrictStr | None = None
 
 
-class DreamRootEvidenceGroup(BaseModel):
+class Capabilities(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    group_id: StrictStr
-    sources: list[DreamSourceReference]
-    independence: DreamEvidenceIndependence = DreamEvidenceIndependence.UNKNOWN
-
-
-class MergeArtifactsRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    inputs: Annotated[list[ArtifactGovernanceInput], Field(min_length=2)]
-    content: Annotated[
-        dict[str, Any], Field(description="Complete content of the result in the Family's content shape.")
+    prompts: Annotated[dict[str, PromptCapability], Field(validate_default=True)] = {}
+    artifact_dreaming: Annotated[
+        StrictBool, Field(description="Whether asynchronous Artifact Dream execution is configured.")
+    ] = False
+    source_types: list[StrictStr]
+    artifact_families: list[StrictStr]
+    memory_extraction: Annotated[StrictBool, Field(description="Whether pending Sources can be extracted into Memory.")]
+    experience_generation: Annotated[
+        StrictBool, Field(description="Whether the configured model can generate reviewed Experience Candidates.")
+    ] = False
+    managed_skill_generation: Annotated[
+        StrictBool, Field(description="Whether the configured model can generate reviewed managed Skill Candidates.")
+    ] = False
+    external_skill_registry: Annotated[
+        StrictBool,
+        Field(description="Whether host-local external Skill discovery and exact resolution are configured."),
+    ] = False
+    handoff_generation: Annotated[
+        StrictBool, Field(description="Whether exact evidence can be generated into an inspectable Handoff Draft.")
     ]
-    source_refs: list[SourceReference] | None = None
-    artifact_refs: list[ArtifactReference] | None = None
-
-
-class ExtractionObservation(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    status: Annotated[
-        Status1,
-        Field(
-            description="Unverified means no execution outcome or control failure has been observed in this window. Observed means at least one success or failure is recorded; neither value is a health verdict."
-        ),
-    ]
-    since: Annotated[
-        AwareDatetime,
-        Field(
-            description="UTC start of this Runtime's observation window. Records cover this process and its child Memory workers, reset on Runtime restart, and do not include remote workers or a durable per-Scope failure history."
-        ),
-    ]
-    last_failure: Annotated[
-        ExtractionFailure | None,
-        Field(
-            description="Most recent historical failure. Retained after subsequent success, possibly in another Scope. This is not an unresolved-incident indicator; null does not prove health."
-        ),
-    ] = None
-    last_success_at: Annotated[
-        AwareDatetime | None,
-        Field(
-            description="UTC time of the most recent local successful nonempty synchronous flush or acknowledged Memory worker invocation. This does not prove that a model was called or that any previous failure has recovered."
-        ),
-    ] = None
+    search_modes: list[MemorySearchMode]
+    context_versions: list[PreparedContextSchema]
 
 
 class CandidateFamilyCount(BaseModel):
@@ -5191,35 +3006,6 @@ class RecallTokenStatistics(BaseModel):
     daily: Annotated[list[RecallTokenDay], Field(max_length=30)]
 
 
-class BootstrapDeliveryReading(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    integration: StrictStr
-    state: BootstrapReceiptState
-    receipts: Annotated[StrictInt, Field(ge=0)]
-    content_bytes: Annotated[
-        StrictInt,
-        Field(
-            description="Sum of prepared package UTF-8 bytes in this current receipt state, not model tokens or proof of adoption.",
-            ge=0,
-        ),
-    ]
-    last_prepared_at: Annotated[
-        AwareDatetime, Field(description="Latest preparation time in this group, not the delivery completion time.")
-    ]
-
-
-class BootstrapDeliveryStatistics(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    period: ResolvedUsagePeriod
-    retention_days: StrictInt
-    actual_adoption: ActualAdoption
-    by_integration: list[BootstrapDeliveryReading]
-
-
 class ScopeStats(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -5229,14 +3015,6 @@ class ScopeStats(BaseModel):
     usage: UsageStatistics
     recall: RecallTokenStatistics
     recurrence: RecurrenceStatistics
-    processing: Annotated[
-        list[ProcessingObservation],
-        Field(
-            description="Current durable bindings and locally observed scheduling state for this Scope; not a complete attempt history.",
-            validate_default=True,
-        ),
-    ] = []
-    bootstrap_delivery: BootstrapDeliveryStatistics | None = None
 
 
 class ScopedStats(BaseModel):
@@ -5258,12 +3036,6 @@ class GetStatsRequest(BaseModel):
     )
     selection: ScopeSelection
     period: StatsPeriod = StatsPeriod.FIELD_30D
-    include_processing: Annotated[
-        StrictBool,
-        Field(
-            description="Include current processing intent counters and optional local scheduler observations. Does not reconstruct remote worker state or complete history."
-        ),
-    ] = False
 
 
 class WorkSourceReceipt(BaseModel):
@@ -5293,6 +3065,14 @@ class SourceObservationReceipt(BaseModel):
     position: Annotated[StrictInt, Field(ge=1)]
 
 
+class HandoffMemoryCitation(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["memory"]
+    memory_citation: MemoryCitation
+
+
 class HandoffSourceCitation(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -5316,75 +3096,14 @@ class HandoffGenerationMetadata(BaseModel):
     edit_status: EditStatus
 
 
-class PreparedContextPromptIdentity(BaseModel):
+class PreparedContext(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    scope_id: StrictStr
-    key: StrictStr
-    definition_version: StrictStr
-    builtin_version: StrictStr
-    selection: Selection
-    selected_version: StrictStr
-    compiled_digest: StrictStr
-    artifact_address: PreparedContextPromptArtifactAddress | None
-
-
-class ContextReuse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Annotated[Schema6, Field(alias="schema")]
-    constraints: ContextReuseConstraints
-    expires_at: AwareDatetime
-    binding: Annotated[StrictStr, Field(max_length=65536, min_length=1)]
-
-
-class ContextProtectionCapabilities(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    check_versions: list[StrictStr]
-    payload_versions: list[StrictStr]
-    reuse_versions: list[StrictStr]
-    reuse_families: list[StrictStr]
-    enforcing: StrictBool
-    limits: ContextProtectionCapabilitiesLimits
-
-
-class BootstrapContextItem(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    kind: BootstrapContextItemKind
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    artifact: ArtifactReference
-    content_digest: Annotated[StrictStr, Field(pattern="^sha256:[0-9a-f]{64}$")]
-    truncated: StrictBool
-
-
-class BootstrapDeliveryReceipt(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    receipt_id: Annotated[StrictStr, Field(max_length=64, min_length=1, pattern="^[\\x21-\\x7E]+$")]
-    state: BootstrapReceiptState
-
-
-class BootstrapContext(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Annotated[BootstrapContextSchema, Field(alias="schema")]
-    status: BootstrapContextStatus
-    reason: Annotated[BootstrapSkipReason | None, Field(...)]
-    profile: BootstrapContextProfile
+    schema_: Annotated[PreparedContextSchema, Field(alias="schema")]
+    status: PreparedContextStatus
     content: Annotated[StrictStr | None, Field(...)]
     content_bytes: Annotated[StrictInt, Field(ge=0)]
-    package_digest: Annotated[StrictStr | None, Field(pattern="^sha256:[0-9a-f]{64}$")]
-    items: Annotated[list[BootstrapContextItem], Field(max_length=7)]
-    truncated: StrictBool
-    receipt: BootstrapDeliveryReceipt
 
 
 class EntryChange(BaseModel):
@@ -5451,7 +3170,7 @@ class RecordSkillUsageRequest(BaseModel):
     selected: StrictBool
     invoked: Invoked
     validation: Validation
-    outcome: Outcome3
+    outcome: Outcome
     task_source: SourceReference | None = None
     environment_fingerprint: Annotated[StrictStr | None, Field(pattern="^sha256:[0-9a-f]{64}$")] = None
 
@@ -5516,19 +3235,11 @@ class FlushMemoryResponse(BaseModel):
     high_watermark: Annotated[StrictInt, Field(ge=0)]
     processed_source_count: Annotated[StrictInt, Field(ge=0)]
     memory: ArtifactReference | None = None
-    remaining_work: Annotated[
-        StrictBool, Field(description="More Source journal work remains after the committed window.")
-    ] = False
     held_count: Annotated[
-        StrictInt,
-        Field(
-            description="Indicator that the write gate held this window: 0 for no HOLD, 1 for HOLD, regardless of how many Sources the window contains. A held window is consumed: current_cursor advances past those Sources and the Runtime does not retry them, so a caller that needs the content re-captures it.",
-            ge=0,
-        ),
+        StrictInt, Field(description="Number of source windows held by the Memory write gate.", ge=0)
     ] = 0
     hold_codes: Annotated[
-        list[StrictStr],
-        Field(description="Gate rejection codes reported for this window; empty unless held_count is 1."),
+        list[StrictStr], Field(description="Structured Memory write gate refusal codes for held windows.")
     ] = []
 
 
@@ -5544,19 +3255,7 @@ class GetMemoryEntryRequest(BaseModel):
         extra="forbid",
     )
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    citation: Annotated[
-        dict[str, Any] | None,
-        Field(description="Legacy exact Memory entry citation. Requests that supply it are rejected as unsupported."),
-    ] = None
-    target: LegacyMemoryTarget | None = None
-
-    @model_validator(mode="after")
-    def _validate_exclusive_fields(self):
-        fields = ("citation", "target")
-        present = tuple(field for field in fields if field in self.model_fields_set)
-        if len(present) != 1 or getattr(self, present[0]) is None:
-            raise ValueError("exactly one non-null address is required")  # noqa: TRY003
-        return self
+    citation: MemoryCitation
 
 
 class GetHandoffReportRequest(BaseModel):
@@ -5585,22 +3284,12 @@ class ListMemoryEntriesRequest(BaseModel):
     )
     tag_filter: TagFilter | None = None
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    include_inactive: Annotated[StrictBool, Field(description="Include all four Atomic Memory lifecycle states.")] = (
-        False
-    )
-    limit: Annotated[StrictInt, Field(ge=1, le=100)] = 50
-    cursor: Annotated[StrictStr | None, Field(min_length=1)] = None
+    include_inactive: Annotated[
+        StrictBool, Field(description="Include inactive entries from the current Memory head for explicit audit.")
+    ] = False
 
 
-class ListMemoryEntriesResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    entries: list[AtomicMemoryRecord]
-    next_cursor: StrictStr | None = None
-
-
-class ListCandidatesRequest(BaseModel):
+class ListArtifactCandidatesRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -5609,15 +3298,27 @@ class ListCandidatesRequest(BaseModel):
     family: CandidateFamily | None = None
     cursor: Annotated[StrictStr | None, Field(max_length=128, min_length=1)] = None
     limit: Annotated[StrictInt, Field(ge=1, le=100)] = 50
-    candidate_kind: CandidateKind | None = None
+
+
+class MemoryEntry(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    citation: MemoryCitation
+    version: Annotated[StrictInt, Field(ge=1)]
+    kind: StrictStr
+    text: StrictStr
+    state: MemoryEntryState
+    source_refs: list[SourceReference]
+    artifact_refs: list[ArtifactReference]
 
 
 class MemoryMutationResponse(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    changed: StrictBool
-    records: list[AtomicMemoryRecord]
+    memory: ArtifactReference
+    entry: MemoryEntry | None = None
 
 
 class MemoryRevisionChanges(BaseModel):
@@ -5628,28 +3329,19 @@ class MemoryRevisionChanges(BaseModel):
     changes: list[EntryChange]
 
 
-class BootstrapContextRequest(BaseModel):
+class ContextAssemblySection(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    enabled: StrictBool = False
-    profile: BootstrapContextProfile = BootstrapContextProfile.POWERCONTEXT_SCOPE_BOOTSTRAP_V1
-    lifecycle: BootstrapContextLifecycle
-    integration: Annotated[StrictStr, Field(max_length=64, min_length=1, pattern="^[\\x21-\\x7E]+$")]
-    event_id: Annotated[
-        StrictStr | None,
+    family: ContextAssemblyFamily
+    limit: Annotated[
+        StrictInt,
         Field(
-            description="Optional stable host event identity, persisted only as a digest. Within the same Scope, integration, and lifecycle, retries must keep the profile, max_bytes, and exact Handoff unchanged.",
-            max_length=512,
-            min_length=1,
-            pattern="^[\\x20-\\x7E]+$",
+            description="Maximum included entries. Each Profile entry is one Scope snapshot. Experience is limited to two. All section limits together must not exceed the Server's runtime.context_assembly_max_entries policy (default 8); exceeding it returns HTTP 422 before recall. The byte budget may reduce the actual output count.",
+            ge=1,
+            le=8,
         ),
-    ] = None
-    max_bytes: Annotated[StrictInt, Field(ge=512, le=8192)] = 4096
-    handoff: Annotated[
-        ArtifactReference | None, Field(description="Optional exact committed Handoff Revision in the current Scope.")
-    ] = None
+    ]
 
 
 class ContextAssembly(BaseModel):
@@ -5675,6 +3367,14 @@ class ProposeExperienceRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    memory_citations: Annotated[
+        list[MemoryCitation],
+        Field(
+            description="Exact Memory entry provenance; non-empty only for Experience. Counted toward the combined evidence bound.",
+            max_length=32,
+            validate_default=True,
+        ),
+    ] = []
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
     proposal: ExperienceProposal
     source_refs: Annotated[
@@ -5696,7 +3396,7 @@ class ProposeExperienceRequest(BaseModel):
 
     @model_validator(mode="after")
     def _reject_excess_candidate_evidence(self):
-        if len(self.source_refs or ()) + len(self.artifact_refs or ()) > 32:
+        if len(self.source_refs) + len(self.artifact_refs) + len(self.memory_citations or ()) > 32:
             raise ValueError(  # noqa: TRY003
                 "source_refs and artifact_refs together must not exceed 32 references"
             )
@@ -5727,7 +3427,7 @@ class GenerateExperienceRequest(BaseModel):
 
     @model_validator(mode="after")
     def _reject_excess_candidate_evidence(self):
-        if len(self.source_refs or ()) + len(self.artifact_refs or ()) > 32:
+        if len(self.source_refs) + len(self.artifact_refs) > 32:
             raise ValueError(  # noqa: TRY003
                 "source_refs and artifact_refs together must not exceed 32 references"
             )
@@ -5759,7 +3459,7 @@ class ProposeSkillRequest(BaseModel):
 
     @model_validator(mode="after")
     def _reject_excess_candidate_evidence(self):
-        if len(self.source_refs or ()) + len(self.artifact_refs or ()) > 32:
+        if len(self.source_refs) + len(self.artifact_refs) > 32:
             raise ValueError(  # noqa: TRY003
                 "source_refs and artifact_refs together must not exceed 32 references"
             )
@@ -5791,7 +3491,7 @@ class GenerateSkillRequest(BaseModel):
 
     @model_validator(mode="after")
     def _reject_excess_candidate_evidence(self):
-        if len(self.source_refs or ()) + len(self.artifact_refs or ()) > 32:
+        if len(self.source_refs) + len(self.artifact_refs) > 32:
             raise ValueError(  # noqa: TRY003
                 "source_refs and artifact_refs together must not exceed 32 references"
             )
@@ -5806,6 +3506,57 @@ class ReadinessResponse(BaseModel):
     checks: dict[str, StrictStr]
 
 
+class ReviseArtifactCandidateRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    memory_citations: Annotated[
+        list[MemoryCitation] | None,
+        Field(
+            description="Omission or null retains the current citations; an explicit array replaces them, including an empty array. Non-empty only for Experience.",
+            max_length=32,
+        ),
+    ] = None
+    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
+    candidate_id: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
+    expected_version: Annotated[StrictInt, Field(ge=1)]
+    proposal: ExperienceProposal | SkillProposal | ProfileWriteContent
+    source_refs: Annotated[
+        list[SourceReference],
+        Field(
+            description="Exact Source evidence. Counted with artifact_refs toward a combined maximum of 32 references.",
+            max_length=32,
+        ),
+    ]
+    artifact_refs: Annotated[
+        list[ArtifactReference],
+        Field(
+            description="Exact Artifact evidence. Counted with source_refs toward a combined maximum of 32 references.",
+            max_length=32,
+        ),
+    ]
+    target: ArtifactReference | None = None
+    reason: Annotated[StrictStr | None, Field(max_length=2000, min_length=1)] = None
+
+    @model_validator(mode="after")
+    def _reject_excess_candidate_evidence(self):
+        if len(self.source_refs) + len(self.artifact_refs) + len(self.memory_citations or ()) > 32:
+            raise ValueError(  # noqa: TRY003
+                "source_refs and artifact_refs together must not exceed 32 references"
+            )
+        return self
+
+
+class SearchMemoryHit(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    citation: MemoryCitation
+    text: StrictStr
+    score: Annotated[StrictFloat, Field(ge=0.0, le=1.0)]
+    matched_by: list[MemoryMatchedBy]
+
+
 class SearchTopicMemoryHit(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -5814,9 +3565,7 @@ class SearchTopicMemoryHit(BaseModel):
     title: Annotated[StrictStr, Field(max_length=512, min_length=1)]
     summary: Annotated[StrictStr, Field(max_length=8000, min_length=1)]
     snippet: Annotated[StrictStr | None, Field(...)]
-    score: Annotated[
-        StrictFloat, Field(description="Weighted RRF relevance normalized to the 0..100 range.", ge=0.0, le=100.0)
-    ]
+    score: Annotated[StrictFloat, Field(ge=0.0)]
     matched_by: Annotated[list[TopicMemoryMatchedBy], Field(min_length=1)]
 
 
@@ -5843,8 +3592,9 @@ class SearchMemoryResponse(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    mode: AtomicMemorySearchMode
-    hits: list[AtomicMemorySearchHit]
+    memory: ArtifactReference | None = None
+    mode: MemoryUsedSearchMode | None = None
+    hits: list[SearchMemoryHit]
 
 
 class TopicMemoryArtifact(BaseModel):
@@ -5886,7 +3636,7 @@ class PromptContent(BaseModel):
         extra="forbid",
     )
     schema_version: SchemaVersion
-    mode: Mode4
+    mode: Mode3
     instructions: Annotated[StrictStr, Field(max_length=32768)]
     demonstrations: Annotated[list[PromptDemonstration], Field(max_length=50)]
 
@@ -5903,8 +3653,6 @@ class ReplaceExperienceArtifactRequest(BaseModel):
         extra="forbid",
     )
     content: ExperienceProposal
-    restored_from_revision: Annotated[StrictInt | None, Field(ge=1)] = None
-    reason: Annotated[StrictStr | None, Field(max_length=1024, min_length=1, pattern=".*\\S.*")] = None
 
 
 class ReplaceSkillArtifactRequest(BaseModel):
@@ -5912,8 +3660,6 @@ class ReplaceSkillArtifactRequest(BaseModel):
         extra="forbid",
     )
     content: SkillProposal
-    restored_from_revision: Annotated[StrictInt | None, Field(ge=1)] = None
-    reason: Annotated[StrictStr | None, Field(max_length=1024, min_length=1, pattern=".*\\S.*")] = None
 
 
 class SourceRecord(BaseModel):
@@ -5924,11 +3670,8 @@ class SourceRecord(BaseModel):
         ),
     ] = None
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    source_type: Annotated[
-        StrictStr,
-        Field(description="Built-in content or a registered Source Observation type.", max_length=128, min_length=1),
-    ]
-    source_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
+    source_type: SourceType
+    source_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern="^[\\x21-\\x7E]+$")]
     content: Annotated[Any, Field(description="Persisted canonical JSON content.")]
     position: Annotated[StrictInt, Field(ge=1)]
     content_digest: Annotated[StrictStr, Field(pattern="^sha256:[0-9a-f]{64}$")]
@@ -5993,6 +3736,7 @@ class DreamInputManifest(BaseModel):
     )
     transform_version: StrictStr = "powercontext.dream.evidence.v1"
     artifacts: Annotated[list[ArtifactReference], Field(validate_default=True)] = []
+    memory_citations: Annotated[list[MemoryCitation], Field(validate_default=True)] = []
     sources: Annotated[list[DreamSourceReference], Field(validate_default=True)] = []
     nodes: Annotated[list[DreamEvidenceNode], Field(validate_default=True)] = []
     edges: Annotated[list[DreamEvidenceEdge], Field(validate_default=True)] = []
@@ -6006,8 +3750,6 @@ class DreamRun(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    tag_target: TagDreamTarget | None = None
-    reused: StrictBool = False
     scope_id: StrictStr
     run_id: StrictStr
     operation: DreamOperation
@@ -6024,14 +3766,8 @@ class DreamRun(BaseModel):
     input_manifest: DreamInputManifest | None = None
     usage: DreamUsage | None = None
     budget: DreamBudget | None = None
-    prompt_version: StrictStr = "powercontext.dream.v1.4"
+    prompt_version: StrictStr = "powercontext.dream.v1"
     model_config_id: Annotated[StrictStr | None, Field(...)]
-    historical_data: Annotated[
-        dict[str, Any] | None,
-        Field(
-            description="Original request and input manifest of a terminal run migrated from the legacy Memory format. Present only on such runs; never accepted as evidence."
-        ),
-    ] = None
 
 
 class DreamRunPage(BaseModel):
@@ -6042,22 +3778,67 @@ class DreamRunPage(BaseModel):
     next_cursor: StrictStr | None = None
 
 
-class ExtractionStatus(BaseModel):
+class ArtifactCandidate(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    configuration: Annotated[
-        Configuration,
+    memory_citations: Annotated[
+        list[MemoryCitation],
         Field(
-            description="Whether a local extraction model or custom pipeline is assembled. Configured does not verify credentials or connectivity. Unknown means execution is external and its configuration is not observed."
+            description="Exact Memory entry provenance; non-empty only for Experience. Counted toward the combined evidence bound.",
+            max_length=32,
+            validate_default=True,
+        ),
+    ] = []
+    permissions: Annotated[
+        CandidatePermissions | None,
+        Field(description="Current Principal permissions in enforced mode; advisory and checked again on mutation."),
+    ] = None
+    candidate_id: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
+    version: Annotated[StrictInt, Field(ge=1)]
+    family: CandidateFamily
+    status: CandidateStatus
+    proposal: ExperienceProposal | SkillProposal | ProfileCandidateProposal
+    source_refs: Annotated[
+        list[SourceReference],
+        Field(
+            description="Exact Source evidence. Counted with artifact_refs toward a combined maximum of 32 references.",
+            max_length=32,
         ),
     ]
-    background: ExtractionBackground
-    observation: ExtractionObservation
+    artifact_refs: Annotated[
+        list[ArtifactReference],
+        Field(
+            description="Exact Artifact evidence. Counted with source_refs toward a combined maximum of 32 references.",
+            max_length=32,
+        ),
+    ]
+    target: Annotated[ArtifactReference | None, Field(...)]
+    reason: Annotated[StrictStr | None, Field(max_length=2000, min_length=1)]
+    result_artifact: Annotated[ArtifactReference | None, Field(...)]
+    decision_reason: Annotated[StrictStr | None, Field(max_length=2000, min_length=1)]
+
+    @model_validator(mode="after")
+    def _reject_excess_candidate_evidence(self):
+        if len(self.source_refs) + len(self.artifact_refs) + len(self.memory_citations or ()) > 32:
+            raise ValueError(  # noqa: TRY003
+                "source_refs and artifact_refs together must not exceed 32 references"
+            )
+        return self
 
 
-class HandoffCitation(RootModel[HandoffSourceCitation | HandoffArtifactCitation]):
-    root: Annotated[HandoffSourceCitation | HandoffArtifactCitation, Field(discriminator="kind")]
+class ArtifactCandidatePage(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidates: list[ArtifactCandidate]
+    next_cursor: Annotated[StrictStr | None, Field(...)]
+
+
+class HandoffCitation(RootModel[HandoffSourceCitation | HandoffArtifactCitation | HandoffMemoryCitation]):
+    root: Annotated[
+        HandoffSourceCitation | HandoffArtifactCitation | HandoffMemoryCitation, Field(discriminator="kind")
+    ]
 
 
 class HandoffEvidenceCheck(BaseModel):
@@ -6092,30 +3873,22 @@ class PrepareHandoffRequest(BaseModel):
     )
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
     objective: Annotated[StrictStr, Field(max_length=8192, min_length=1, pattern=".*\\S.*")]
-    rollover_reasons: Annotated[list[HandoffRolloverReason], Field(max_length=6)] = []
     evidence: Annotated[list[HandoffCitation], Field(max_length=32, min_length=1)]
     max_bytes: Annotated[StrictInt, Field(ge=512, le=32768)] = 8000
-
-
-class PreparedContextRerankConfig(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    config_id: Annotated[StrictStr, Field(pattern="^sha256:[0-9a-f]{64}$")]
-    policy_id: StrictStr
-    model: Annotated[StrictStr | None, Field(...)]
-    effective_settings: dict[str, StrictStr | StrictInt | StrictFloat | StrictBool]
-    timeout_seconds: Annotated[StrictFloat, Field(gt=0.0)]
-    max_requests: Annotated[StrictInt, Field(ge=1)]
-    config_digest: Annotated[StrictStr, Field(pattern="^sha256:[0-9a-f]{64}$")]
-    prompt: PreparedContextPromptIdentity | None
-    non_deterministic: StrictBool
 
 
 class ExperienceArtifact(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    memory_citations: Annotated[
+        list[MemoryCitation],
+        Field(
+            description="Exact Memory entry provenance; non-empty only for Experience. Counted toward the combined evidence bound.",
+            max_length=32,
+            validate_default=True,
+        ),
+    ] = []
     artifact: ArtifactReference
     content: ExperienceProposal
     source_refs: list[SourceReference]
@@ -6126,6 +3899,14 @@ class SkillArtifact(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    memory_citations: Annotated[
+        list[MemoryCitation],
+        Field(
+            description="Exact Memory entry provenance; non-empty only for Experience. Counted toward the combined evidence bound.",
+            max_length=32,
+            validate_default=True,
+        ),
+    ] = []
     artifact: ArtifactReference
     content: SkillProposal
     source_refs: list[SourceReference]
@@ -6158,6 +3939,14 @@ class ListMemoryChangesResponse(BaseModel):
     revisions: list[MemoryRevisionChanges]
 
 
+class ListMemoryEntriesResponse(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    memory: ArtifactReference | None = None
+    entries: list[MemoryEntry]
+
+
 class PrepareContextRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -6169,25 +3958,15 @@ class PrepareContextRequest(BaseModel):
         StrictBool,
         Field(description="Opt into current-Scope native code evidence. No index is built during preparation."),
     ] = False
-    include_reuse: Annotated[
-        StrictBool,
-        Field(
-            description="Return a versioned context and reuse envelope. Supported for single-Scope Atomic Memory with complete bounded dependencies; unsupported selected families, code, or references are rejected explicitly."
-        ),
-    ] = False
-    include_receipt: Annotated[
-        StrictBool | None, Field(description="Opt into a bounded, content-free PreparedContext Receipt.")
-    ] = False
     assembly: ContextAssembly | None = None
-    bootstrap_receipt_id: Annotated[
-        StrictStr | None,
-        Field(
-            description="Optional exact receipt for the last successfully injected bootstrap package. Only fully delivered Atomic Memory revisions from an injected same-Scope receipt are removed before candidate limiting and sufficiency assessment; Artifacts whose bootstrap bodies were truncated remain eligible.",
-            max_length=64,
-            min_length=1,
-            pattern="^[\\x21-\\x7E]+$",
-        ),
-    ] = None
+
+
+class GeneratedCandidateResponse(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    status: GeneratedCandidateStatus
+    candidate: Annotated[ArtifactCandidate | None, Field(...)]
 
 
 class CreatePromptArtifactRequest(BaseModel):
@@ -6212,8 +3991,6 @@ class ReplacePromptArtifactRequest(BaseModel):
         extra="forbid",
     )
     content: PromptContent
-    restored_from_revision: Annotated[StrictInt | None, Field(ge=1)] = None
-    reason: Annotated[StrictStr | None, Field(max_length=1024, min_length=1, pattern=".*\\S.*")] = None
 
 
 class ReplaceMemoryArtifactRequest(BaseModel):
@@ -6230,51 +4007,8 @@ class ActivateHandoffRequest(BaseModel):
     scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
     boundary_source: SourceReference
     objective: Annotated[StrictStr, Field(max_length=8192, min_length=1, pattern=".*\\S.*")]
-    rollover_reasons: Annotated[list[HandoffRolloverReason], Field(max_length=6)] = []
     evidence: Annotated[list[HandoffCitation], Field(max_length=32, validate_default=True)] = []
     max_bytes: Annotated[StrictInt, Field(ge=512, le=32768)] = 8000
-
-
-class Capabilities(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    prompts: Annotated[dict[str, PromptCapability], Field(validate_default=True)] = {}
-    artifact_dreaming: Annotated[
-        StrictBool, Field(description="Whether asynchronous Artifact Dream execution is configured.")
-    ] = False
-    artifact_dreaming_operations: Annotated[
-        list[ArtifactDreamingOperationCapability],
-        Field(
-            description="Dream operations enabled by the current Runtime, including their reviewed effect.",
-            validate_default=True,
-        ),
-    ] = []
-    source_types: list[StrictStr]
-    artifact_families: list[StrictStr]
-    memory_extraction: Annotated[StrictBool, Field(description="Whether pending Sources can be extracted into Memory.")]
-    extraction: Annotated[
-        ExtractionStatus | None,
-        Field(
-            description="Live Memory extraction diagnostics. Null means diagnostics are not supplied by this runtime. This read does not call a model or prove provider connectivity."
-        ),
-    ] = None
-    experience_generation: Annotated[
-        StrictBool, Field(description="Whether the configured model can generate reviewed Experience Candidates.")
-    ] = False
-    managed_skill_generation: Annotated[
-        StrictBool, Field(description="Whether the configured model can generate reviewed managed Skill Candidates.")
-    ] = False
-    external_skill_registry: Annotated[
-        StrictBool,
-        Field(description="Whether host-local external Skill discovery and exact resolution are configured."),
-    ] = False
-    handoff_generation: Annotated[
-        StrictBool, Field(description="Whether exact evidence can be generated into an inspectable Handoff Draft.")
-    ]
-    search_modes: list[MemorySearchMode]
-    context_versions: list[PreparedContextSchema]
-    context_protection: ContextProtectionCapabilities | None = None
 
 
 class WorkClaim(BaseModel):
@@ -6349,30 +4083,6 @@ class TaskCheck(BaseModel):
     evidence: Annotated[list[HandoffCitation], Field(max_length=32)]
 
 
-class TaskStopReason(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    kind: TaskStopReasonKind
-    condition: Annotated[
-        StrictStr,
-        Field(
-            description="The circumstance under which continuing would have been wrong; must be trimmed.",
-            max_length=8192,
-            min_length=1,
-            pattern=".*\\S.*",
-        ),
-    ]
-    basis: WorkClaimBasis
-    evidence: Annotated[
-        list[HandoffCitation],
-        Field(
-            description="Use [] with declared. verified requires exact previously returned same-scope citations.",
-            max_length=31,
-        ),
-    ]
-
-
 class TaskOutcome(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -6383,10 +4093,6 @@ class TaskOutcome(BaseModel):
     status: TaskOutcomeStatus
     summary: Annotated[StrictStr, Field(max_length=8192, min_length=1, pattern=".*\\S.*")]
     handoff_receipt_ref: SourceReference | None = None
-    stop_reason: Annotated[
-        TaskStopReason | None,
-        Field(description="Optional deliberate-stop reason, accepted only with blocked or cancelled status."),
-    ] = None
     observations: Annotated[list[WorkClaim], Field(max_length=64, min_length=1)]
     checks: Annotated[list[TaskCheck], Field(max_length=64)]
     produced_artifacts: Annotated[list[ArtifactReference], Field(max_length=32)]
@@ -6452,73 +4158,6 @@ class PreparedHandoff(BaseModel):
     content: HandoffContent
 
 
-class PreparedContextRetrieval(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    rounds: Annotated[list[PreparedContextRecallRound], Field(max_length=3)]
-    searches: Annotated[list[PreparedContextSearchGroup], Field(max_length=32)]
-    rerank_configs: Annotated[list[PreparedContextRerankConfig], Field(max_length=8)]
-    reranks: Annotated[list[PreparedContextRerankGroup], Field(max_length=32)]
-
-
-class ReviseCandidateRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    sources: Annotated[
-        list[DreamSourceReference] | None,
-        Field(
-            description="Tag proposal Source evidence. Omission retains existing evidence; do not combine with source_refs.",
-            max_length=32,
-        ),
-    ] = None
-    artifacts: Annotated[
-        list[ArtifactReference] | None,
-        Field(
-            description="Tag proposal Artifact evidence. Omission retains existing evidence; do not combine with artifact_refs.",
-            max_length=32,
-        ),
-    ] = None
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    candidate_id: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
-    expected_version: Annotated[StrictInt, Field(ge=1)]
-    proposal: (
-        ExperienceProposal
-        | SkillProposal
-        | ProfileWriteContent
-        | AtomicMemoryWriteContent
-        | TopicMemoryDreamProposal
-        | HandoffContent
-        | PromptContent
-        | CatalogChangeProposal
-    )
-    source_refs: Annotated[
-        list[SourceReference] | None,
-        Field(
-            description="Exact Source evidence. Counted with artifact_refs toward a combined maximum of 32 references.",
-            max_length=32,
-        ),
-    ] = None
-    artifact_refs: Annotated[
-        list[ArtifactReference] | None,
-        Field(
-            description="Exact Artifact evidence. Counted with source_refs toward a combined maximum of 32 references.",
-            max_length=32,
-        ),
-    ] = None
-    target: ArtifactReference | None = None
-    reason: Annotated[StrictStr | None, Field(max_length=2000, min_length=1)] = None
-
-    @model_validator(mode="after")
-    def _reject_excess_candidate_evidence(self):
-        if len(self.source_refs or ()) + len(self.artifact_refs or ()) > 32:
-            raise ValueError(  # noqa: TRY003
-                "source_refs and artifact_refs together must not exceed 32 references"
-            )
-        return self
-
-
 class CreateHandoffArtifactRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -6532,72 +4171,6 @@ class ReplaceHandoffArtifactRequest(BaseModel):
         extra="forbid",
     )
     content: HandoffContent
-    restored_from_revision: Annotated[StrictInt | None, Field(ge=1)] = None
-    reason: Annotated[StrictStr | None, Field(max_length=1024, min_length=1, pattern=".*\\S.*")] = None
-
-
-class Candidate(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    audit: CandidateAudit | None = None
-    permissions: Annotated[
-        CandidatePermissions | None,
-        Field(description="Current Principal permissions in enforced mode; advisory and checked again on mutation."),
-    ] = None
-    candidate_id: Annotated[StrictStr, Field(max_length=128, min_length=1, pattern="^[\\x21-\\x7E]+$")]
-    version: Annotated[StrictInt, Field(ge=1)]
-    family: CandidateFamily
-    status: CandidateStatus
-    proposal: (
-        ExperienceProposal
-        | SkillProposal
-        | ProfileCandidateProposal
-        | AtomicMemoryReadContent
-        | TopicMemoryDreamProposal
-        | HandoffContent
-        | PromptContent
-        | CatalogChangeProposal
-    )
-    source_refs: Annotated[
-        list[SourceReference],
-        Field(
-            description="Exact Source evidence. Counted with artifact_refs toward a combined maximum of 32 references.",
-            max_length=32,
-        ),
-    ]
-    artifact_refs: Annotated[
-        list[ArtifactReference],
-        Field(
-            description="Exact Artifact evidence. Counted with source_refs toward a combined maximum of 32 references.",
-            max_length=32,
-        ),
-    ]
-    target: Annotated[ArtifactReference | None, Field(...)]
-    reason: Annotated[StrictStr | None, Field(max_length=2000, min_length=1)]
-    result_artifact: Annotated[ArtifactReference | None, Field(...)]
-    decision_reason: Annotated[StrictStr | None, Field(max_length=2000, min_length=1)]
-    candidate_kind: CandidateKind
-    result: CatalogTagResult | None = None
-    operation: StrictStr | None = None
-    origin: Origin | None = None
-    dream_run_id: StrictStr | None = None
-
-    @model_validator(mode="after")
-    def _reject_excess_candidate_evidence(self):
-        if len(self.source_refs or ()) + len(self.artifact_refs or ()) > 32:
-            raise ValueError(  # noqa: TRY003
-                "source_refs and artifact_refs together must not exceed 32 references"
-            )
-        return self
-
-
-class CandidatePage(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    candidates: list[Candidate]
-    next_cursor: Annotated[StrictStr | None, Field(...)]
 
 
 class PreparedWorkHandoff(BaseModel):
@@ -6660,27 +4233,6 @@ class ContinueHandoffRequest(BaseModel):
     revision: ArtifactReference | None = None
 
 
-class PrepareHandoffHintRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    scope_id: Annotated[StrictStr, Field(max_length=256, min_length=1, pattern=".*\\S.*")]
-    selection: HandoffSelection
-    prepared: Annotated[
-        PreparedHandoff | None,
-        Field(description="Required only for prepared selection; retain this complete value for continuation."),
-    ] = None
-    revision: Annotated[ArtifactReference | None, Field(description="Required only for exact selection.")] = None
-    max_bytes: Annotated[
-        StrictInt,
-        Field(
-            description="Complete rendered UTF-8 text budget including notice, boundaries, and exact references.",
-            ge=1,
-            le=4000,
-        ),
-    ] = 2000
-
-
 class FinalizeHandoffRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -6700,37 +4252,9 @@ class HandoffActivation(BaseModel):
     draft: Annotated[HandoffDraft | None, Field(...)]
 
 
-class PreparedContextReceipt(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Annotated[Schema4, Field(alias="schema")]
-    receipt_id: UUID
-    policy_id: PolicyId
-    query_digest: Annotated[StrictStr, Field(pattern="^sha256:[0-9a-f]{64}$")]
-    content_digest: Annotated[StrictStr | None, Field(pattern="^sha256:[0-9a-f]{64}$")]
-    requested_max_bytes: Annotated[StrictInt, Field(ge=512, le=32768)]
-    used_bytes: Annotated[StrictInt, Field(ge=0)]
-    truncated: StrictBool
-    non_deterministic: StrictBool
-    retrieval: PreparedContextRetrieval
-    selected: Annotated[list[PreparedContextSelectedItem], Field(max_length=32)]
-    omitted: Annotated[list[PreparedContextOmittedGroup], Field(max_length=16)]
-    stages: Annotated[list[PreparedContextStageTiming], Field(max_length=8)]
-
-
-class GeneratedCandidateResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    status: GeneratedCandidateStatus
-    candidate: Annotated[Candidate | None, Field(...)]
-
-
-class CreateBuiltinArtifactRequest(
+class CreateArtifactRequest(
     RootModel[
-        CreateAtomicMemoryArtifactRequest
-        | CreateTopicMemoryArtifactRequest
+        CreateTopicMemoryArtifactRequest
         | CreateMemoryArtifactRequest
         | CreateExperienceArtifactRequest
         | CreateSkillArtifactRequest
@@ -6740,8 +4264,7 @@ class CreateBuiltinArtifactRequest(
     ]
 ):
     root: Annotated[
-        CreateAtomicMemoryArtifactRequest
-        | CreateTopicMemoryArtifactRequest
+        CreateTopicMemoryArtifactRequest
         | CreateMemoryArtifactRequest
         | CreateExperienceArtifactRequest
         | CreateSkillArtifactRequest
@@ -6754,91 +4277,21 @@ class CreateBuiltinArtifactRequest(
 
 class ReplaceArtifactRequest(
     RootModel[
-        ReplaceAtomicMemoryArtifactRequest
-        | ReplaceTopicMemoryArtifactRequest
+        ReplaceTopicMemoryArtifactRequest
         | ReplaceMemoryArtifactRequest
         | ReplaceExperienceArtifactRequest
         | ReplaceSkillArtifactRequest
         | ReplaceHandoffArtifactRequest
         | ReplacePromptArtifactRequest
         | ReplaceProfileArtifactRequest
-        | ReplacePluginArtifactRequest
     ]
 ):
-    root: Annotated[
-        ReplaceAtomicMemoryArtifactRequest
-        | ReplaceTopicMemoryArtifactRequest
+    root: (
+        ReplaceTopicMemoryArtifactRequest
         | ReplaceMemoryArtifactRequest
         | ReplaceExperienceArtifactRequest
         | ReplaceSkillArtifactRequest
         | ReplaceHandoffArtifactRequest
         | ReplacePromptArtifactRequest
         | ReplaceProfileArtifactRequest
-        | ReplacePluginArtifactRequest,
-        Field(
-            description="The complete content for the family in the path. A plugin family's content is any object, so a built-in family's request also matches the plugin branch; the path family selects the branch the Server applies."
-        ),
-    ]
-
-
-class CandidateHistory(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
     )
-    versions: list[Candidate]
-
-
-class PreparedContext(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Annotated[Literal["powercontext.prepared-context.v1"], Field(alias="schema")]
-    status: PreparedContextStatus
-    content: Annotated[StrictStr | None, Field(...)]
-    content_bytes: Annotated[StrictInt, Field(ge=0)]
-    receipt: Annotated[
-        PreparedContextReceipt | None, Field(description="Present only when requested and successfully assembled.")
-    ] = None
-
-
-class PreparedContextWithReuse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    schema_: Annotated[Literal["powercontext.prepared-context-with-reuse.v1"], Field(alias="schema")]
-    context: PreparedContext
-    reuse: ContextReuse
-
-
-_CREATE_ARTIFACT_REQUEST_BUILTIN_FAMILIES = frozenset([
-    "atomic-memory",
-    "experience",
-    "handoff",
-    "memory",
-    "profile",
-    "prompt",
-    "skill",
-    "topic-memory",
-])
-
-
-def _create_artifact_request_branch(value: Any) -> str:
-    family = value.get("family") if isinstance(value, dict) else getattr(value, "family", None)
-    return (
-        "plugin" if isinstance(family, str) and family not in _CREATE_ARTIFACT_REQUEST_BUILTIN_FAMILIES else "builtin"
-    )
-
-
-class CreateArtifactRequest(RootModel[CreateBuiltinArtifactRequest | CreatePluginArtifactRequest]):
-    root: Annotated[
-        Annotated[CreateBuiltinArtifactRequest, UnionTag("builtin")]
-        | Annotated[CreatePluginArtifactRequest, UnionTag("plugin")],
-        Discriminator(_create_artifact_request_branch),
-        Field(
-            description="A built-in family's creation request, or the complete content of an Artifact in a loaded plugin's family. The family name selects the branch: built-in names select the built-in branch."
-        ),
-    ]
-
-
-class PrepareContextResult(RootModel[PreparedContext | PreparedContextWithReuse]):
-    root: Annotated[PreparedContext | PreparedContextWithReuse, Field(discriminator="schema_")]

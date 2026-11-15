@@ -14,45 +14,23 @@ from powercontext.http._generated.models import (
     AccessCheckRequest,
     AccessCheckResponse,
     AccessMeResponse,
-    AccessOwnershipApplyResult,
-    AccessOwnershipPlan,
     AccessResourcePage,
     AccessRolePage,
     AcknowledgeHandoffRequest,
     ActivateHandoffRequest,
-    ApplyAccessOwnershipRequest,
-    ApproveCandidateRequest,
+    ApproveArtifactCandidateRequest,
+    ArtifactCandidate,
+    ArtifactCandidatePage,
     ArtifactCreated,
-    ArtifactGovernanceRecord,
-    ArtifactGovernanceResponse,
-    ArtifactHandleBinding,
     ArtifactPage,
     ArtifactPublication,
-    ArtifactRendering,
-    ArtifactRestorationResult,
     ArtifactRevision,
     ArtifactRevisionPage,
     ArtifactTagPage,
     ArtifactTagSet,
-    AtomicMemoryLifecycleRequest,
-    AtomicMemoryMutationResponse,
-    AtomicMemoryRestorationPreview,
-    AtomicMemoryRestorationPreviewRequest,
-    AtomicMemoryRestorationRequest,
-    AtomicMemoryRestorationResponse,
-    AtomicMemoryStateResponse,
-    BindArtifactHandleRequest,
-    BootstrapContext,
-    BootstrapContextRequest,
-    BootstrapDeliveryReceipt,
-    Candidate,
-    CandidateHistory,
-    CandidatePage,
     Capabilities,
     CaptureContentSourceRequest,
     CaptureContentSourceResponse,
-    CaptureWorkingNoteRequest,
-    CheckContextRequest,
     ClearScopeBindingRequest,
     ClearScopeBindingResponse,
     CodeQueryRequest,
@@ -60,9 +38,7 @@ from powercontext.http._generated.models import (
     CommitConnectorCheckpointRequest,
     CommitHandoffRequest,
     CommittedHandoff,
-    ConnectionIdentity,
     ConnectorCheckpointState,
-    ContextCheckResult,
     ContinueHandoffRequest,
     CreateAccessBindingRequest,
     CreateArtifactRequest,
@@ -86,23 +62,19 @@ from powercontext.http._generated.models import (
     FlushProfileResponse,
     FlushTopicMemoryRequest,
     FlushTopicMemoryResponse,
-    ForgetArtifactRequest,
     GeneratedCandidateResponse,
     GenerateExperienceRequest,
     GeneratePromptDemonstrationsRequest,
     GenerateSkillRequest,
-    GetArtifactRenderingRequest,
-    GetCandidateRequest,
+    GetArtifactCandidateRequest,
     GetConnectorCheckpointRequest,
     GetExperienceRequest,
     GetHandoffReportRequest,
     GetMemoryCapacityRequest,
     GetMemoryEntryRequest,
-    GetMemoryEntryResponse,
     GetSkillPackageRequest,
     GetSkillRequest,
     GetStatsRequest,
-    GetTopicMemoryProcessingBlockRequest,
     GetTopicMemoryRequest,
     HandoffAcknowledgement,
     HandoffActivation,
@@ -116,11 +88,9 @@ from powercontext.http._generated.models import (
     ListAccessBindingsRequest,
     ListAccessResourcesRequest,
     ListAccessRolesRequest,
+    ListArtifactCandidatesRequest,
     ListArtifactRevisionsRequest,
     ListArtifactsRequest,
-    ListAtomicMemoryRequest,
-    ListAtomicMemoryResponse,
-    ListCandidatesRequest,
     ListDreamRunsRequest,
     ListExternalSkillsRequest,
     ListExternalSkillsResponse,
@@ -130,25 +100,17 @@ from powercontext.http._generated.models import (
     ListMemoryChangesResponse,
     ListMemoryEntriesRequest,
     ListMemoryEntriesResponse,
-    ListPluginScopesRequest,
     ListRemoteSkillTargetsRequest,
     ListRemoteSkillTargetsResponse,
     ListScopesRequest,
     ListSourcesRequest,
     MemoryCapacity,
+    MemoryEntry,
     MemoryMutationResponse,
-    MergeArtifactsRequest,
-    MergeAtomicMemoryRequest,
-    PlanAccessOwnershipRequest,
-    PluginPage,
-    PluginScopePage,
-    PluginState,
     PrepareContextRequest,
-    PrepareContextResult,
     PreparedContext,
     PreparedHandoff,
     PreparedWorkHandoff,
-    PrepareHandoffHintRequest,
     PrepareHandoffRequest,
     ProfilePolicyResponse,
     PromptConfiguration,
@@ -161,16 +123,13 @@ from powercontext.http._generated.models import (
     PutProfilePolicyRequest,
     QueryArtifactTagsRequest,
     ReadinessResponse,
-    RecallManifestRequest,
-    RecallManifestResponse,
     ReconcileRemoteSkillsRequest,
     ReconcileRemoteSkillsResponse,
-    RecordBootstrapDeliveryRequest,
     RecordRemoteSkillReceiptRequest,
     RecordSkillUsageRequest,
     RecordTaskOutcomeRequest,
     RegisterSourceDefinitionRequest,
-    RejectCandidateRequest,
+    RejectArtifactCandidateRequest,
     RememberMemoryRequest,
     RemoteSkillPublication,
     RemoteSkillReceiptResponse,
@@ -184,11 +143,8 @@ from powercontext.http._generated.models import (
     ResolveExternalSkillRequest,
     ResolveScopeBindingRequest,
     ResolveScopeSelectionRequest,
-    RestoreArtifactRequest,
     RetireMemoryEntryRequest,
-    RetryTopicMemoryProcessingRequest,
-    RetryTopicMemoryProcessingResponse,
-    ReviseCandidateRequest,
+    ReviseArtifactCandidateRequest,
     ReviseMemoryEntryRequest,
     RevokeAccessBindingRequest,
     RevokeRemoteSkillTargetRequest,
@@ -198,48 +154,22 @@ from powercontext.http._generated.models import (
     ScopeDescriptor,
     ScopedStats,
     ScopePage,
-    SearchArtifactsRequest,
-    SearchArtifactsResponse,
-    SearchAtomicMemoryRequest,
-    SearchAtomicMemoryResponse,
     SearchMemoryRequest,
     SearchMemoryResponse,
     SearchTopicMemoryRequest,
     SearchTopicMemoryResponse,
-    ServerInfo,
     SetDefaultScopeRequest,
     SetScopeBindingRequest,
     SkillArtifact,
     SkillGovernance,
     SkillPackageDownload,
     SkillPackageManifest,
-    SourceAddRequest,
-    SourceCapabilityQuery,
-    SourceCapabilityResponse,
-    SourceChannelOpen,
-    SourceChannelRequest,
-    SourceChannelResponse,
-    SourceConfigureRequest,
     SourceDefinitionManifest,
-    SourceInstanceExchangeRequest,
-    SourceInstanceExchangeResponse,
-    SourceInstanceSetEnabledRequest,
-    SourceInstancesQuery,
-    SourceInstancesResponse,
-    SourceInstanceStatus,
-    SourceManagementReceipt,
     SourceObservationReceipt,
     SourcePage,
     SourceRecord,
-    SourceStatusRequest,
-    SourceTargetSetEnabledRequest,
-    SourceWritePluginLoadRequest,
-    SourceWritePluginState,
     SubmitSourceObservationRequest,
     TopicMemoryArtifact,
-    TopicMemoryProcessingBlock,
-    TopicMemoryProcessingStatus,
-    TopicMemoryProcessingStatusRequest,
     UnpublishRemoteSkillRequest,
     UpdateScopeRequest,
     UpdateSkillLifecycleRequest,
@@ -249,19 +179,7 @@ from powercontext.http._generated.models import (
 OPENAPI_VERSION = "3.0.3"
 API_TITLE = "PowerContext API"
 API_DESCRIPTION = "Remote PowerContext transport. Runtime behavior is reported by /v1/capabilities."
-API_VERSION = "1.5.1"
-FEATURE_CONTRACTS: dict[str, dict[str, JsonValue]] = {
-    "connection.identity": {"version": {"major": 1, "minor": 0}, "operations": ["get_connection_identity"]},
-    "access.principal": {"version": {"major": 1, "minor": 0}, "operations": ["get_access_principal"]},
-    "scope.selection": {
-        "version": {"major": 1, "minor": 0},
-        "operations": ["list_scopes", "get_scope", "get_default_scope"],
-    },
-    "memory.explicit": {
-        "version": {"major": 1, "minor": 0},
-        "operations": ["remember_memory", "search_memory", "get_memory_entry"],
-    },
-}
+API_VERSION = "1.2.0"
 
 RequestT = TypeVar("RequestT")
 ResponseT = TypeVar("ResponseT")
@@ -289,219 +207,6 @@ class AccessRequirement(BaseModel):
     scope_id_field: str | None
     resolver: str
 
-
-GET_RECALL_MANIFEST = Operation[RecallManifestRequest, RecallManifestResponse](
-    method="POST",
-    path="/v1/recall/manifest",
-    operation_id="get_recall_manifest",
-    request_type=RecallManifestRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=RecallManifestResponse,
-    success_status=200,
-    summary="Read a bounded metadata-only recall manifest",
-    tags=("atomic-memory",),
-    scope_mode="current",
-    responses={
-        200: {"description": "Operation completed."},
-        400: {"$ref": "#/components/responses/InvalidRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        500: {"$ref": "#/components/responses/InternalError"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
-LIST_ATOMIC_MEMORIES = Operation[ListAtomicMemoryRequest, ListAtomicMemoryResponse](
-    method="POST",
-    path="/v1/atomic-memory/list",
-    operation_id="list_atomic_memories",
-    request_type=ListAtomicMemoryRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=ListAtomicMemoryResponse,
-    success_status=200,
-    summary="List Atomic Memory heads by lifecycle and metadata",
-    tags=("atomic-memory",),
-    scope_mode="current",
-    responses={
-        200: {"description": "Operation completed."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        500: {"$ref": "#/components/responses/InternalError"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
-SEARCH_ATOMIC_MEMORY = Operation[SearchAtomicMemoryRequest, SearchAtomicMemoryResponse](
-    method="POST",
-    path="/v1/atomic-memory/search",
-    operation_id="search_atomic_memory",
-    request_type=SearchAtomicMemoryRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=SearchAtomicMemoryResponse,
-    success_status=200,
-    summary="Search active Atomic Memories",
-    tags=("atomic-memory",),
-    scope_mode="current",
-    responses={
-        200: {"description": "Operation completed."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        500: {"$ref": "#/components/responses/InternalError"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
-MERGE_ATOMIC_MEMORIES = Operation[MergeAtomicMemoryRequest, AtomicMemoryMutationResponse](
-    method="POST",
-    path="/v1/atomic-memory/merges",
-    operation_id="merge_atomic_memories",
-    request_type=MergeAtomicMemoryRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=AtomicMemoryMutationResponse,
-    success_status=200,
-    summary="Merge exact active Atomic Memories into a new Artifact",
-    tags=("atomic-memory",),
-    scope_mode="current",
-    responses={
-        200: {"description": "Operation completed."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        500: {"$ref": "#/components/responses/InternalError"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="atomic_memory_domain_access"),
-)
-
-CHANGE_ATOMIC_MEMORY_LIFECYCLE = Operation[AtomicMemoryLifecycleRequest, AtomicMemoryMutationResponse](
-    method="POST",
-    path="/v1/atomic-memory/lifecycle",
-    operation_id="change_atomic_memory_lifecycle",
-    request_type=AtomicMemoryLifecycleRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=AtomicMemoryMutationResponse,
-    success_status=200,
-    summary="Forget one Atomic Memory without changing its content revision",
-    tags=("atomic-memory",),
-    scope_mode="current",
-    responses={
-        200: {"description": "Operation completed."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        500: {"$ref": "#/components/responses/InternalError"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="atomic_memory_domain_access"),
-)
-
-PREVIEW_ATOMIC_MEMORY_RESTORATION = Operation[AtomicMemoryRestorationPreviewRequest, AtomicMemoryRestorationPreview](
-    method="POST",
-    path="/v1/atomic-memory/restoration-previews",
-    operation_id="preview_atomic_memory_restoration",
-    request_type=AtomicMemoryRestorationPreviewRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=AtomicMemoryRestorationPreview,
-    success_status=200,
-    summary="Preview a complete Atomic Memory restoration",
-    tags=("atomic-memory",),
-    scope_mode="current",
-    responses={
-        200: {"description": "Operation completed."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        500: {"$ref": "#/components/responses/InternalError"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="atomic_memory_domain_access"),
-)
-
-RESTORE_ATOMIC_MEMORY = Operation[AtomicMemoryRestorationRequest, AtomicMemoryRestorationResponse](
-    method="POST",
-    path="/v1/atomic-memory/restorations",
-    operation_id="restore_atomic_memory",
-    request_type=AtomicMemoryRestorationRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=AtomicMemoryRestorationResponse,
-    success_status=200,
-    summary="Restore Atomic Memory content and undo dependent merges atomically",
-    tags=("atomic-memory",),
-    scope_mode="current",
-    responses={
-        200: {"description": "Operation completed."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        500: {"$ref": "#/components/responses/InternalError"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="atomic_memory_domain_access"),
-)
-
-GET_ATOMIC_MEMORY_STATE = Operation[None, AtomicMemoryStateResponse](
-    method="GET",
-    path="/v1/scopes/{scope_id}/artifacts/atomic-memory/{artifact_id}/state",
-    operation_id="get_atomic_memory_state",
-    request_type=None,
-    request_location=None,
-    path_parameters=("scope_id", "artifact_id"),
-    response_type=AtomicMemoryStateResponse,
-    success_status=200,
-    summary="Read the current four-state Atomic Memory lifecycle",
-    tags=("atomic-memory",),
-    scope_mode="current",
-    responses={
-        200: {
-            "description": "Current content reference and lifecycle state.",
-            "headers": {
-                "ETag": {
-                    "description": "ETag for the current content revision and state version.",
-                    "schema": {"type": "string"},
-                }
-            },
-        },
-        304: {
-            "description": "The current representation is unchanged.",
-            "headers": {"ETag": {"schema": {"type": "string"}}},
-        },
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        500: {"$ref": "#/components/responses/InternalError"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="atomic_memory_state_access"),
-)
 
 CREATE_SUBJECT_SOURCE = Operation[CreateSubjectSourceRequest, CreateSubjectSourceResponse](
     method="POST",
@@ -665,30 +370,6 @@ GET_READINESS = Operation[None, ReadinessResponse](
     access=None,
 )
 
-GET_SERVER_INFO = Operation[None, ServerInfo](
-    method="GET",
-    path="/v1/server-info",
-    operation_id="get_server_info",
-    request_type=None,
-    request_location=None,
-    path_parameters=(),
-    response_type=ServerInfo,
-    success_status=200,
-    summary="Get stable Server deployment identity and protocol contracts",
-    tags=("server",),
-    scope_mode="none",
-    responses={
-        200: {
-            "description": "Stable deployment identity and protocol compatibility metadata.",
-            "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
-        },
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="server.observe", resource="server", scope_id_field=None, resolver="static"),
-)
-
 GET_CAPABILITIES = Operation[None, Capabilities](
     method="GET",
     path="/v1/capabilities",
@@ -847,7 +528,6 @@ GET_DEFAULT_SCOPE = Operation[None, ScopeDescriptor](
     responses={
         200: {"description": "The ordinary Scope selected by the host default pointer."},
         404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
         401: {"$ref": "#/components/responses/Unauthorized"},
         403: {"$ref": "#/components/responses/Forbidden"},
         503: {"$ref": "#/components/responses/Unavailable"},
@@ -915,7 +595,6 @@ RESOLVE_SCOPE_BINDING = Operation[ResolveScopeBindingRequest, ScopeDescriptor](
     responses={
         200: {"description": "The resolved Scope descriptor."},
         404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
         401: {"$ref": "#/components/responses/Unauthorized"},
         403: {"$ref": "#/components/responses/Forbidden"},
         503: {"$ref": "#/components/responses/Unavailable"},
@@ -984,35 +663,6 @@ CAPTURE_CONTENT_SOURCE = Operation[CaptureContentSourceRequest, CaptureContentSo
     responses={
         202: {
             "description": "The Source is durably stored for later processing.",
-            "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
-        },
-        409: {"$ref": "#/components/responses/Conflict"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-        500: {"$ref": "#/components/responses/InternalError"},
-    },
-    access=AccessRequirement(
-        action="scope.contribute", resource="scope", scope_id_field="scope_id", resolver="request"
-    ),
-)
-
-CAPTURE_WORKING_NOTE = Operation[CaptureWorkingNoteRequest, CaptureContentSourceResponse](
-    method="POST",
-    path="/v1/sources/working-notes",
-    operation_id="capture_working_note",
-    request_type=CaptureWorkingNoteRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=CaptureContentSourceResponse,
-    success_status=202,
-    summary="Capture session-local working evidence",
-    tags=("sources",),
-    scope_mode="current",
-    responses={
-        202: {
-            "description": "The Working Note is durably stored as Source evidence.",
             "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
         },
         409: {"$ref": "#/components/responses/Conflict"},
@@ -1155,14 +805,14 @@ QUERY_CODE = Operation[CodeQueryRequest, CodeQueryResponse](
     access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
 )
 
-PREPARE_CONTEXT = Operation[PrepareContextRequest, PrepareContextResult](
+PREPARE_CONTEXT = Operation[PrepareContextRequest, PreparedContext](
     method="POST",
     path="/v1/context/prepare",
     operation_id="prepare_context",
     request_type=PrepareContextRequest,
     request_location="body",
     path_parameters=(),
-    response_type=PrepareContextResult,
+    response_type=PreparedContext,
     success_status=200,
     summary="Prepare bounded context for an Agent turn",
     tags=("context",),
@@ -1172,83 +822,6 @@ PREPARE_CONTEXT = Operation[PrepareContextRequest, PrepareContextResult](
             "description": "Final context ready for direct injection, or a normal empty result.",
             "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
         },
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-        500: {"$ref": "#/components/responses/InternalError"},
-    },
-    access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
-CHECK_CONTEXT = Operation[CheckContextRequest, ContextCheckResult](
-    method="POST",
-    path="/v1/context/check",
-    operation_id="check_context",
-    request_type=CheckContextRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=ContextCheckResult,
-    success_status=200,
-    summary="Check a final model request or complete raw response",
-    tags=("context",),
-    scope_mode="current",
-    responses={
-        200: {
-            "description": "A phase-specific allow, block, or withhold decision; HTTP success alone is not approval.",
-            "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
-        },
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        413: {"description": "The complete payload exceeds the configured admission limit."},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-        500: {"$ref": "#/components/responses/InternalError"},
-    },
-    access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
-PREPARE_BOOTSTRAP_CONTEXT = Operation[BootstrapContextRequest, BootstrapContext](
-    method="POST",
-    path="/v1/context/bootstrap",
-    operation_id="prepare_bootstrap_context",
-    request_type=BootstrapContextRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=BootstrapContext,
-    success_status=200,
-    summary="Prepare bounded context for an Agent lifecycle boundary",
-    tags=("context",),
-    scope_mode="current",
-    responses={
-        200: {
-            "description": "A bounded package ready for host injection, or a normal empty/skipped result.",
-            "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
-        },
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-        500: {"$ref": "#/components/responses/InternalError"},
-    },
-    access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
-RECORD_BOOTSTRAP_DELIVERY = Operation[RecordBootstrapDeliveryRequest, BootstrapDeliveryReceipt](
-    method="POST",
-    path="/v1/context/bootstrap/receipts",
-    operation_id="record_bootstrap_delivery",
-    request_type=RecordBootstrapDeliveryRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=BootstrapDeliveryReceipt,
-    success_status=200,
-    summary="Record a bootstrap delivery outcome",
-    tags=("context",),
-    scope_mode="current",
-    responses={
-        200: {"description": "Current durable delivery state."},
         401: {"$ref": "#/components/responses/Unauthorized"},
         403: {"$ref": "#/components/responses/Forbidden"},
         422: {"$ref": "#/components/responses/InvalidRequest"},
@@ -1519,33 +1092,6 @@ CONTINUE_HANDOFF = Operation[ContinueHandoffRequest, HandoffResolution](
     access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="continue_handoff_access"),
 )
 
-PREPARE_HANDOFF_HINT = Operation[PrepareHandoffHintRequest, PreparedContext](
-    method="POST",
-    path="/v1/handoff/hint",
-    operation_id="prepare_handoff_hint",
-    request_type=PrepareHandoffHintRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=PreparedContext,
-    success_status=200,
-    summary="Prepare optional compact continuity hints from a selected Handoff",
-    tags=("handoff",),
-    scope_mode="current",
-    responses={
-        200: {
-            "description": "Bounded orientation text, or empty when no complete supported hint can be delivered.",
-            "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
-        },
-        404: {"$ref": "#/components/responses/NotFound"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-        500: {"$ref": "#/components/responses/InternalError"},
-    },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="continue_handoff_access"),
-)
-
 FLUSH_TOPIC_MEMORY = Operation[FlushTopicMemoryRequest, FlushTopicMemoryResponse](
     method="POST",
     path="/v1/topic-memory/flush",
@@ -1572,271 +1118,6 @@ FLUSH_TOPIC_MEMORY = Operation[FlushTopicMemoryRequest, FlushTopicMemoryResponse
     access=AccessRequirement(
         action="scope.contribute", resource="scope", scope_id_field="scope_id", resolver="request"
     ),
-)
-
-LIST_PLUGINS = Operation[None, PluginPage](
-    method="GET",
-    path="/v1/plugins",
-    operation_id="list_plugins",
-    request_type=None,
-    request_location=None,
-    path_parameters=(),
-    response_type=PluginPage,
-    success_status=200,
-    summary="List loaded plugins",
-    tags=("plugins",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Plugins found in the plugin directory at startup."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="server.admin", resource="server", scope_id_field=None, resolver="static"),
-)
-
-GET_PLUGIN = Operation[None, PluginState](
-    method="GET",
-    path="/v1/plugins/{name}",
-    operation_id="get_plugin",
-    request_type=None,
-    request_location=None,
-    path_parameters=("name",),
-    response_type=PluginState,
-    success_status=200,
-    summary="Get one loaded plugin",
-    tags=("plugins",),
-    scope_mode="none",
-    responses={
-        200: {"description": "The plugin's startup check result and declaration."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="server.admin", resource="server", scope_id_field=None, resolver="static"),
-)
-
-LIST_PLUGIN_SCOPES = Operation[ListPluginScopesRequest, PluginScopePage](
-    method="GET",
-    path="/v1/plugins/{name}/scopes",
-    operation_id="list_plugin_scopes",
-    request_type=ListPluginScopesRequest,
-    request_location="query",
-    path_parameters=("name",),
-    response_type=PluginScopePage,
-    success_status=200,
-    summary="List a plugin's progress per Scope",
-    tags=("plugins",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Scopes the plugin has been asked to process, ordered by Scope ID."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="server.admin", resource="server", scope_id_field=None, resolver="static"),
-)
-
-MERGE_ARTIFACTS = Operation[MergeArtifactsRequest, ArtifactGovernanceResponse](
-    method="POST",
-    path="/v1/scopes/{scope_id}/artifacts/{family}/merges",
-    operation_id="merge_artifacts",
-    request_type=MergeArtifactsRequest,
-    request_location="body",
-    path_parameters=("scope_id", "family"),
-    response_type=ArtifactGovernanceResponse,
-    success_status=200,
-    summary="Merge exact current Artifacts into a new Artifact",
-    tags=("artifacts",),
-    scope_mode="current",
-    responses={
-        200: {"description": "The merge result and the frozen inputs."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="artifact_merge_domain_access"),
-)
-
-GET_ARTIFACT_GOVERNANCE = Operation[None, ArtifactGovernanceRecord](
-    method="GET",
-    path="/v1/scopes/{scope_id}/artifacts/{family}/{artifact_id}/governance",
-    operation_id="get_artifact_governance",
-    request_type=None,
-    request_location=None,
-    path_parameters=("scope_id", "family", "artifact_id"),
-    response_type=ArtifactGovernanceRecord,
-    success_status=200,
-    summary="Read an Artifact's current governance state",
-    tags=("artifacts",),
-    scope_mode="current",
-    responses={
-        200: {"description": "The current governance state."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="artifact_merge_domain_access"),
-)
-
-FORGET_ARTIFACT = Operation[ForgetArtifactRequest, ArtifactGovernanceResponse](
-    method="POST",
-    path="/v1/scopes/{scope_id}/artifacts/{family}/{artifact_id}/forget",
-    operation_id="forget_artifact",
-    request_type=ForgetArtifactRequest,
-    request_location="body",
-    path_parameters=("scope_id", "family", "artifact_id"),
-    response_type=ArtifactGovernanceResponse,
-    success_status=200,
-    summary="Forget one Artifact without changing its content revision",
-    tags=("artifacts",),
-    scope_mode="current",
-    responses={
-        200: {"description": "The Artifact's governance state after forgetting."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="artifact_merge_domain_access"),
-)
-
-RESTORE_ARTIFACT = Operation[RestoreArtifactRequest, ArtifactRestorationResult](
-    method="POST",
-    path="/v1/scopes/{scope_id}/artifacts/{family}/{artifact_id}/restorations",
-    operation_id="restore_artifact",
-    request_type=RestoreArtifactRequest,
-    request_location="body",
-    path_parameters=("scope_id", "family", "artifact_id"),
-    response_type=ArtifactRestorationResult,
-    success_status=200,
-    summary="Restore an Artifact or undo the merge that produced it",
-    tags=("artifacts",),
-    scope_mode="current",
-    responses={
-        200: {"description": "The revisions restored and retired by the operation."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="artifact_merge_domain_access"),
-)
-
-SEARCH_ARTIFACTS = Operation[SearchArtifactsRequest, SearchArtifactsResponse](
-    method="POST",
-    path="/v1/scopes/{scope_id}/artifacts/{family}/search",
-    operation_id="search_artifacts",
-    request_type=SearchArtifactsRequest,
-    request_location="body",
-    path_parameters=("scope_id", "family"),
-    response_type=SearchArtifactsResponse,
-    success_status=200,
-    summary="Search one Artifact Family in a Scope",
-    tags=("artifacts",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Complete matching Artifact revisions in retrieval order."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-        500: {"$ref": "#/components/responses/InternalError"},
-    },
-    access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
-GET_TOPIC_MEMORY_PROCESSING_STATUS = Operation[TopicMemoryProcessingStatusRequest, TopicMemoryProcessingStatus](
-    method="POST",
-    path="/v1/topic-memory/processing/status",
-    operation_id="get_topic_memory_processing_status",
-    request_type=TopicMemoryProcessingStatusRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=TopicMemoryProcessingStatus,
-    success_status=200,
-    summary="Inspect Topic Memory processing and its current terminal block",
-    tags=("topic-memory",),
-    scope_mode="current",
-    responses={
-        200: {
-            "description": "Current durable processing state.",
-            "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
-        },
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-        500: {"$ref": "#/components/responses/InternalError"},
-    },
-    access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
-GET_TOPIC_MEMORY_PROCESSING_BLOCK = Operation[GetTopicMemoryProcessingBlockRequest, TopicMemoryProcessingBlock](
-    method="POST",
-    path="/v1/topic-memory/processing/blocks/get",
-    operation_id="get_topic_memory_processing_block",
-    request_type=GetTopicMemoryProcessingBlockRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=TopicMemoryProcessingBlock,
-    success_status=200,
-    summary="Get a retained Topic Memory processing block",
-    tags=("topic-memory",),
-    scope_mode="current",
-    responses={
-        200: {
-            "description": "The exact retained block.",
-            "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
-        },
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-        500: {"$ref": "#/components/responses/InternalError"},
-    },
-    access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
-RETRY_TOPIC_MEMORY_PROCESSING = Operation[RetryTopicMemoryProcessingRequest, RetryTopicMemoryProcessingResponse](
-    method="POST",
-    path="/v1/topic-memory/processing/retry",
-    operation_id="retry_topic_memory_processing",
-    request_type=RetryTopicMemoryProcessingRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=RetryTopicMemoryProcessingResponse,
-    success_status=200,
-    summary="Explicitly retry one observed Topic Memory block",
-    tags=("topic-memory",),
-    scope_mode="current",
-    responses={
-        200: {
-            "description": "One retry was durably accepted, including duplicate acceptance.",
-            "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
-        },
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-        500: {"$ref": "#/components/responses/InternalError"},
-    },
-    access=AccessRequirement(action="scope.admin", resource="scope", scope_id_field="scope_id", resolver="request"),
 )
 
 SEARCH_TOPIC_MEMORY = Operation[SearchTopicMemoryRequest, SearchTopicMemoryResponse](
@@ -1929,7 +1210,7 @@ REMEMBER_MEMORY = Operation[RememberMemoryRequest, MemoryMutationResponse](
     path_parameters=(),
     response_type=MemoryMutationResponse,
     success_status=200,
-    summary="Create Atomic Memory through the legacy remember input",
+    summary="Remember explicit Memory content",
     tags=("memory",),
     scope_mode="current",
     responses={
@@ -1958,7 +1239,7 @@ SEARCH_MEMORY = Operation[SearchMemoryRequest, SearchMemoryResponse](
     path_parameters=(),
     response_type=SearchMemoryResponse,
     success_status=200,
-    summary="Search active Atomic Memory through the legacy query input",
+    summary="Search active Memory entries",
     tags=("memory",),
     scope_mode="current",
     responses={
@@ -1985,9 +1266,9 @@ GET_MEMORY_CAPACITY = Operation[GetMemoryCapacityRequest, MemoryCapacity](
     path_parameters=(),
     response_type=MemoryCapacity,
     success_status=200,
-    summary="Unsupported legacy collection capacity",
+    summary="Read Memory capacity",
     tags=("memory",),
-    scope_mode="none",
+    scope_mode="current",
     responses={
         200: {
             "description": "Capacity of one exact current Memory Revision.",
@@ -2000,7 +1281,7 @@ GET_MEMORY_CAPACITY = Operation[GetMemoryCapacityRequest, MemoryCapacity](
         503: {"$ref": "#/components/responses/Unavailable"},
         500: {"$ref": "#/components/responses/InternalError"},
     },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="atomic_memory_domain_access"),
+    access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
 )
 
 LIST_MEMORY_ENTRIES = Operation[ListMemoryEntriesRequest, ListMemoryEntriesResponse](
@@ -2012,7 +1293,7 @@ LIST_MEMORY_ENTRIES = Operation[ListMemoryEntriesRequest, ListMemoryEntriesRespo
     path_parameters=(),
     response_type=ListMemoryEntriesResponse,
     success_status=200,
-    summary="List Atomic Memory through the legacy inventory input",
+    summary="List Memory entries",
     tags=("memory",),
     scope_mode="current",
     responses={
@@ -2030,16 +1311,16 @@ LIST_MEMORY_ENTRIES = Operation[ListMemoryEntriesRequest, ListMemoryEntriesRespo
     access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
 )
 
-GET_MEMORY_ENTRY = Operation[GetMemoryEntryRequest, GetMemoryEntryResponse](
+GET_MEMORY_ENTRY = Operation[GetMemoryEntryRequest, MemoryEntry](
     method="POST",
     path="/v1/memory/entries/get",
     operation_id="get_memory_entry",
     request_type=GetMemoryEntryRequest,
     request_location="body",
     path_parameters=(),
-    response_type=GetMemoryEntryResponse,
+    response_type=MemoryEntry,
     success_status=200,
-    summary="Read the current Atomic Memory mapped from a legacy target",
+    summary="Get an exact Memory entry version",
     tags=("memory",),
     scope_mode="current",
     responses={
@@ -2066,9 +1347,9 @@ REVISE_MEMORY_ENTRY = Operation[ReviseMemoryEntryRequest, MemoryMutationResponse
     path_parameters=(),
     response_type=MemoryMutationResponse,
     success_status=200,
-    summary="Unsupported legacy citation revision",
+    summary="Revise an exact Memory entry",
     tags=("memory",),
-    scope_mode="none",
+    scope_mode="current",
     responses={
         200: {
             "description": "The Memory entry revision completed.",
@@ -2094,9 +1375,9 @@ RETIRE_MEMORY_ENTRY = Operation[RetireMemoryEntryRequest, MemoryMutationResponse
     path_parameters=(),
     response_type=MemoryMutationResponse,
     success_status=200,
-    summary="Unsupported legacy citation retirement",
+    summary="Retire an exact Memory entry",
     tags=("memory",),
-    scope_mode="none",
+    scope_mode="current",
     responses={
         200: {
             "description": "The Memory entry retirement completed.",
@@ -2122,12 +1403,12 @@ LIST_MEMORY_CHANGES = Operation[ListMemoryChangesRequest, ListMemoryChangesRespo
     path_parameters=(),
     response_type=ListMemoryChangesResponse,
     success_status=200,
-    summary="Unsupported continuous legacy collection changes",
+    summary="List Memory Revision changes",
     tags=("memory",),
-    scope_mode="none",
+    scope_mode="current",
     responses={
         200: {
-            "description": "Reserved legacy response shape; this operation returns operation_not_supported.",
+            "description": "Compact changes through the selected Memory Revision.",
             "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
         },
         404: {"$ref": "#/components/responses/NotFound"},
@@ -2153,7 +1434,6 @@ LIST_DREAM_RUNS = Operation[ListDreamRunsRequest, DreamRunPage](
     tags=("dream",),
     scope_mode="none",
     responses={
-        426: {"$ref": "#/components/responses/ClientUpgradeRequired"},
         200: {
             "description": "The requested Dream state.",
             "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
@@ -2182,7 +1462,6 @@ CREATE_DREAM_RUN = Operation[CreateDreamRunRequest, DreamRun](
     tags=("dream",),
     scope_mode="none",
     responses={
-        426: {"$ref": "#/components/responses/ClientUpgradeRequired"},
         202: {
             "description": "The accepted queued or running Dream.",
             "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
@@ -2219,7 +1498,6 @@ GET_DREAM_RUN = Operation[None, DreamRun](
     tags=("dream",),
     scope_mode="none",
     responses={
-        426: {"$ref": "#/components/responses/ClientUpgradeRequired"},
         200: {
             "description": "The requested Dream state.",
             "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
@@ -2235,14 +1513,14 @@ GET_DREAM_RUN = Operation[None, DreamRun](
     access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="path_scope_read_access"),
 )
 
-PROPOSE_EXPERIENCE = Operation[ProposeExperienceRequest, Candidate](
+PROPOSE_EXPERIENCE = Operation[ProposeExperienceRequest, ArtifactCandidate](
     method="POST",
     path="/v1/experience/propose",
     operation_id="propose_experience",
     request_type=ProposeExperienceRequest,
     request_location="body",
     path_parameters=(),
-    response_type=Candidate,
+    response_type=ArtifactCandidate,
     success_status=201,
     summary="Propose Experience content",
     tags=("experience",),
@@ -2320,14 +1598,14 @@ GET_EXPERIENCE = Operation[GetExperienceRequest, ExperienceArtifact](
     access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="exact_experience_access"),
 )
 
-PROPOSE_SKILL = Operation[ProposeSkillRequest, Candidate](
+PROPOSE_SKILL = Operation[ProposeSkillRequest, ArtifactCandidate](
     method="POST",
     path="/v1/skill/propose",
     operation_id="propose_skill",
     request_type=ProposeSkillRequest,
     request_location="body",
     path_parameters=(),
-    response_type=Candidate,
+    response_type=ArtifactCandidate,
     success_status=201,
     summary="Propose managed Skill content",
     tags=("skill",),
@@ -2503,14 +1781,14 @@ DOWNLOAD_SKILL_PACKAGE = Operation[GetSkillPackageRequest, SkillPackageDownload]
     access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="exact_skill_access"),
 )
 
-PROPOSE_SKILL_PACKAGE = Operation[ProposeSkillPackageRequest, Candidate](
+PROPOSE_SKILL_PACKAGE = Operation[ProposeSkillPackageRequest, ArtifactCandidate](
     method="POST",
     path="/v1/skill/package/propose",
     operation_id="propose_skill_package",
     request_type=ProposeSkillPackageRequest,
     request_location="body",
     path_parameters=(),
-    response_type=Candidate,
+    response_type=ArtifactCandidate,
     success_status=201,
     summary="Propose an uploaded standard Skill package",
     tags=("skill",),
@@ -2897,20 +2175,19 @@ IMPORT_EXTERNAL_SKILL = Operation[ImportExternalSkillRequest, GeneratedCandidate
     ),
 )
 
-LIST_CANDIDATES = Operation[ListCandidatesRequest, CandidatePage](
+LIST_ARTIFACT_CANDIDATES = Operation[ListArtifactCandidatesRequest, ArtifactCandidatePage](
     method="POST",
-    path="/v1/candidates/list",
-    operation_id="list_candidates",
-    request_type=ListCandidatesRequest,
+    path="/v1/artifact-candidates/list",
+    operation_id="list_artifact_candidates",
+    request_type=ListArtifactCandidatesRequest,
     request_location="body",
     path_parameters=(),
-    response_type=CandidatePage,
+    response_type=ArtifactCandidatePage,
     success_status=200,
-    summary="List Candidates",
+    summary="List Artifact Candidates",
     tags=("review",),
     scope_mode="current",
     responses={
-        426: {"$ref": "#/components/responses/ClientUpgradeRequired"},
         200: {
             "description": "The selected current Candidate heads.",
             "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
@@ -2924,20 +2201,19 @@ LIST_CANDIDATES = Operation[ListCandidatesRequest, CandidatePage](
     access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
 )
 
-GET_CANDIDATE = Operation[GetCandidateRequest, Candidate](
+GET_ARTIFACT_CANDIDATE = Operation[GetArtifactCandidateRequest, ArtifactCandidate](
     method="POST",
-    path="/v1/candidates/get",
-    operation_id="get_candidate",
-    request_type=GetCandidateRequest,
+    path="/v1/artifact-candidates/get",
+    operation_id="get_artifact_candidate",
+    request_type=GetArtifactCandidateRequest,
     request_location="body",
     path_parameters=(),
-    response_type=Candidate,
+    response_type=ArtifactCandidate,
     success_status=200,
-    summary="Get a Candidate",
+    summary="Get an Artifact Candidate",
     tags=("review",),
     scope_mode="current",
     responses={
-        426: {"$ref": "#/components/responses/ClientUpgradeRequired"},
         200: {
             "description": "The current Candidate head.",
             "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
@@ -2952,20 +2228,19 @@ GET_CANDIDATE = Operation[GetCandidateRequest, Candidate](
     access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
 )
 
-APPROVE_CANDIDATE = Operation[ApproveCandidateRequest, Candidate](
+APPROVE_ARTIFACT_CANDIDATE = Operation[ApproveArtifactCandidateRequest, ArtifactCandidate](
     method="POST",
-    path="/v1/candidates/approve",
-    operation_id="approve_candidate",
-    request_type=ApproveCandidateRequest,
+    path="/v1/artifact-candidates/approve",
+    operation_id="approve_artifact_candidate",
+    request_type=ApproveArtifactCandidateRequest,
     request_location="body",
     path_parameters=(),
-    response_type=Candidate,
+    response_type=ArtifactCandidate,
     success_status=200,
-    summary="Approve a Candidate",
+    summary="Approve an Artifact Candidate",
     tags=("review",),
     scope_mode="current",
     responses={
-        426: {"$ref": "#/components/responses/ClientUpgradeRequired"},
         200: {
             "description": "The approved Candidate and exact result Artifact.",
             "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
@@ -2981,20 +2256,19 @@ APPROVE_CANDIDATE = Operation[ApproveCandidateRequest, Candidate](
     access=AccessRequirement(action="scope.review", resource="scope", scope_id_field="scope_id", resolver="request"),
 )
 
-REJECT_CANDIDATE = Operation[RejectCandidateRequest, Candidate](
+REJECT_ARTIFACT_CANDIDATE = Operation[RejectArtifactCandidateRequest, ArtifactCandidate](
     method="POST",
-    path="/v1/candidates/reject",
-    operation_id="reject_candidate",
-    request_type=RejectCandidateRequest,
+    path="/v1/artifact-candidates/reject",
+    operation_id="reject_artifact_candidate",
+    request_type=RejectArtifactCandidateRequest,
     request_location="body",
     path_parameters=(),
-    response_type=Candidate,
+    response_type=ArtifactCandidate,
     success_status=200,
-    summary="Reject a Candidate",
+    summary="Reject an Artifact Candidate",
     tags=("review",),
     scope_mode="current",
     responses={
-        426: {"$ref": "#/components/responses/ClientUpgradeRequired"},
         200: {
             "description": "The rejected Candidate.",
             "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
@@ -3010,20 +2284,19 @@ REJECT_CANDIDATE = Operation[RejectCandidateRequest, Candidate](
     access=AccessRequirement(action="scope.review", resource="scope", scope_id_field="scope_id", resolver="request"),
 )
 
-REVISE_CANDIDATE = Operation[ReviseCandidateRequest, Candidate](
+REVISE_ARTIFACT_CANDIDATE = Operation[ReviseArtifactCandidateRequest, ArtifactCandidate](
     method="POST",
-    path="/v1/candidates/revise",
-    operation_id="revise_candidate",
-    request_type=ReviseCandidateRequest,
+    path="/v1/artifact-candidates/revise",
+    operation_id="revise_artifact_candidate",
+    request_type=ReviseArtifactCandidateRequest,
     request_location="body",
     path_parameters=(),
-    response_type=Candidate,
+    response_type=ArtifactCandidate,
     success_status=200,
-    summary="Revise a Candidate",
+    summary="Revise an Artifact Candidate",
     tags=("review",),
     scope_mode="current",
     responses={
-        426: {"$ref": "#/components/responses/ClientUpgradeRequired"},
         200: {
             "description": "The next pending Candidate version.",
             "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
@@ -3037,32 +2310,6 @@ REVISE_CANDIDATE = Operation[ReviseCandidateRequest, Candidate](
         500: {"$ref": "#/components/responses/InternalError"},
     },
     access=AccessRequirement(action="scope.review", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
-GET_CANDIDATE_HISTORY = Operation[GetCandidateRequest, CandidateHistory](
-    method="POST",
-    path="/v1/candidates/history",
-    operation_id="get_candidate_history",
-    request_type=GetCandidateRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=CandidateHistory,
-    success_status=200,
-    summary="History Candidates",
-    tags=("review",),
-    scope_mode="current",
-    responses={
-        426: {"$ref": "#/components/responses/ClientUpgradeRequired"},
-        200: {"description": "Current Candidate state."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-        500: {"$ref": "#/components/responses/InternalError"},
-    },
-    access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
 )
 
 GET_STATS = Operation[GetStatsRequest, ScopedStats](
@@ -3290,55 +2537,6 @@ LIST_ARTIFACTS = Operation[ListArtifactsRequest, ArtifactPage](
     access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
 )
 
-RESOLVE_ARTIFACT_HANDLE = Operation[None, ArtifactHandleBinding](
-    method="GET",
-    path="/v1/scopes/{scope_id}/artifact-handles/{family}/{key}",
-    operation_id="resolve_artifact_handle",
-    request_type=None,
-    request_location=None,
-    path_parameters=("scope_id", "family", "key"),
-    response_type=ArtifactHandleBinding,
-    success_status=200,
-    summary="Resolve a stable Artifact handle",
-    tags=("artifacts",),
-    scope_mode="none",
-    responses={
-        200: {"description": "The exact Artifact revision bound to the handle."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-        500: {"$ref": "#/components/responses/InternalError"},
-    },
-    access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
-BIND_ARTIFACT_HANDLE = Operation[BindArtifactHandleRequest, ArtifactHandleBinding](
-    method="PUT",
-    path="/v1/scopes/{scope_id}/artifact-handles/{family}/{key}",
-    operation_id="bind_artifact_handle",
-    request_type=BindArtifactHandleRequest,
-    request_location="body",
-    path_parameters=("scope_id", "family", "key"),
-    response_type=ArtifactHandleBinding,
-    success_status=200,
-    summary="Bind a stable Artifact handle",
-    tags=("artifacts",),
-    scope_mode="none",
-    responses={
-        200: {"description": "The existing or newly committed handle binding."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-        500: {"$ref": "#/components/responses/InternalError"},
-    },
-    access=AccessRequirement(action="scope.admin", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
 GET_ARTIFACT = Operation[None, ArtifactRevision](
     method="GET",
     path="/v1/scopes/{scope_id}/artifacts/{family}/{artifact_id}",
@@ -3350,7 +2548,7 @@ GET_ARTIFACT = Operation[None, ArtifactRevision](
     success_status=200,
     summary="Get the current Artifact head",
     tags=("artifacts",),
-    scope_mode="current",
+    scope_mode="none",
     responses={
         200: {
             "description": "The current visible Artifact head.",
@@ -3387,7 +2585,7 @@ REPLACE_ARTIFACT = Operation[ReplaceArtifactRequest, ArtifactRevision](
     success_status=200,
     summary="Replace the current Artifact head",
     tags=("artifacts",),
-    scope_mode="current",
+    scope_mode="none",
     responses={
         200: {
             "description": "The complete replacement was committed as the next revision.",
@@ -3580,37 +2778,12 @@ GET_ARTIFACT_REVISION = Operation[None, ArtifactRevision](
     success_status=200,
     summary="Get one exact immutable Artifact revision",
     tags=("artifacts",),
-    scope_mode="current",
+    scope_mode="none",
     responses={
         200: {
             "description": "The exact immutable Artifact revision.",
             "headers": {"X-PowerContext-Request-ID": {"$ref": "#/components/headers/RequestId"}},
         },
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-        500: {"$ref": "#/components/responses/InternalError"},
-    },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="path_artifact_read_access"),
-)
-
-GET_ARTIFACT_RENDERING = Operation[GetArtifactRenderingRequest, ArtifactRendering](
-    method="GET",
-    path="/v1/scopes/{scope_id}/artifacts/{family}/{artifact_id}/rendering",
-    operation_id="get_artifact_rendering",
-    request_type=GetArtifactRenderingRequest,
-    request_location="query",
-    path_parameters=("scope_id", "family", "artifact_id"),
-    response_type=ArtifactRendering,
-    success_status=200,
-    summary="Present a plugin Artifact",
-    tags=("artifacts",),
-    scope_mode="none",
-    responses={
-        200: {"description": "The rendering of the exact revision."},
-        400: {"$ref": "#/components/responses/BadRequest"},
         401: {"$ref": "#/components/responses/Unauthorized"},
         403: {"$ref": "#/components/responses/Forbidden"},
         404: {"$ref": "#/components/responses/NotFound"},
@@ -3699,27 +2872,6 @@ GENERATE_PROMPT_DEMONSTRATIONS = Operation[GeneratePromptDemonstrationsRequest, 
         500: {"$ref": "#/components/responses/InternalError"},
     },
     access=AccessRequirement(action="scope.admin", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
-GET_CONNECTION_IDENTITY = Operation[None, ConnectionIdentity](
-    method="GET",
-    path="/v1/connection/identity",
-    operation_id="get_connection_identity",
-    request_type=None,
-    request_location=None,
-    path_parameters=(),
-    response_type=ConnectionIdentity,
-    success_status=200,
-    summary="Observe the current connection identity without readiness probes",
-    tags=("access",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Current request identity; not an operation authorization or binary attestation."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="access.self", resource="server", scope_id_field=None, resolver="static"),
 )
 
 GET_ACCESS_PRINCIPAL = Operation[None, AccessMeResponse](
@@ -3914,409 +3066,6 @@ LIST_ACCESS_AUDIT = Operation[ListAccessAuditRequest, AccessAuditPage](
     scope_mode="none",
     responses={
         200: {"description": "Ordered authorization and relationship audit events."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="access.self", resource="server", scope_id_field=None, resolver="static"),
-)
-
-PC_SOURCE_CAPABILITIES = Operation[SourceCapabilityQuery, SourceCapabilityResponse](
-    method="POST",
-    path="/v1/source-management/capabilities",
-    operation_id="pc_source_capabilities",
-    request_type=SourceCapabilityQuery,
-    request_location="body",
-    path_parameters=(),
-    response_type=SourceCapabilityResponse,
-    success_status=200,
-    summary="pc source capabilities",
-    tags=("source-management",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Confirmed Source management result."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="scope.read", resource="scope", scope_id_field="scope_id", resolver="request"),
-)
-
-PC_SOURCE_ADD = Operation[SourceAddRequest, SourceManagementReceipt](
-    method="POST",
-    path="/v1/source-management/add",
-    operation_id="pc_source_add",
-    request_type=SourceAddRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=SourceManagementReceipt,
-    success_status=200,
-    summary="pc source add",
-    tags=("source-management",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Confirmed Source management result."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(
-        action="scope.contribute", resource="scope", scope_id_field="scope_id", resolver="request"
-    ),
-)
-
-PC_SOURCE_STATUS = Operation[SourceStatusRequest, SourceManagementReceipt](
-    method="POST",
-    path="/v1/source-management/status",
-    operation_id="pc_source_status",
-    request_type=SourceStatusRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=SourceManagementReceipt,
-    success_status=200,
-    summary="pc source status",
-    tags=("source-management",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Confirmed Source management result."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="source_status_access"),
-)
-
-PC_SOURCE_TARGET_SET_ENABLED = Operation[SourceTargetSetEnabledRequest, SourceManagementReceipt](
-    method="POST",
-    path="/v1/source-management/target-set-enabled",
-    operation_id="pc_source_target_set_enabled",
-    request_type=SourceTargetSetEnabledRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=SourceManagementReceipt,
-    success_status=200,
-    summary="Stop or resume a collect target",
-    tags=("source-management",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Confirmed Source management result."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(
-        action="scope.contribute", resource="scope", scope_id_field="scope_id", resolver="request"
-    ),
-)
-
-PC_SOURCE_INSTANCES = Operation[SourceInstancesQuery, SourceInstancesResponse](
-    method="POST",
-    path="/v1/source-management/instances",
-    operation_id="pc_source_instances",
-    request_type=SourceInstancesQuery,
-    request_location="body",
-    path_parameters=(),
-    response_type=SourceInstancesResponse,
-    success_status=200,
-    summary="pc source instances",
-    tags=("source-management",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Confirmed Source management result."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action=None, resource=None, scope_id_field=None, resolver="source_instances_access"),
-)
-
-PC_SOURCE_INSTANCE_SET_ENABLED = Operation[SourceInstanceSetEnabledRequest, SourceInstanceStatus](
-    method="POST",
-    path="/v1/source-management/instance-set-enabled",
-    operation_id="pc_source_instance_set_enabled",
-    request_type=SourceInstanceSetEnabledRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=SourceInstanceStatus,
-    success_status=200,
-    summary="pc source instance set enabled",
-    tags=("source-management",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Confirmed Source management result."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="server.admin", resource="server", scope_id_field=None, resolver="static"),
-)
-
-SOURCE_CONFIGURE = Operation[SourceConfigureRequest, SourceInstanceStatus](
-    method="POST",
-    path="/v1/source-management/configure",
-    operation_id="source_configure",
-    request_type=SourceConfigureRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=SourceInstanceStatus,
-    success_status=200,
-    summary="source configure",
-    tags=("source-management",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Confirmed Source management result."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        404: {"$ref": "#/components/responses/NotFound"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="server.admin", resource="server", scope_id_field=None, resolver="static"),
-)
-
-LOAD_SOURCE_WRITE_PLUGIN = Operation[SourceWritePluginLoadRequest, SourceWritePluginState](
-    method="POST",
-    path="/v1/source-management/write/load",
-    operation_id="load_source_write_plugin",
-    request_type=SourceWritePluginLoadRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=SourceWritePluginState,
-    success_status=200,
-    summary="Load a trusted Server-local Source write plugin",
-    tags=("source-management",),
-    scope_mode="none",
-    responses={
-        200: {"description": "The Server has loaded and persisted the executable write capabilities."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="server.admin", resource="server", scope_id_field=None, resolver="static"),
-)
-
-SOURCE_CHANNEL_OPEN = Operation[SourceChannelOpen, SourceChannelResponse](
-    method="POST",
-    path="/v1/source-management/channel/open",
-    operation_id="source_channel_open",
-    request_type=SourceChannelOpen,
-    request_location="body",
-    path_parameters=(),
-    response_type=SourceChannelResponse,
-    success_status=200,
-    summary="Source manager reverse channel open",
-    tags=("source-management-channel",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Channel exchange."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(
-        action=None, resource=None, scope_id_field=None, resolver="source_management_channel_access"
-    ),
-)
-
-SOURCE_CHANNEL_CATALOG = Operation[SourceChannelRequest, SourceChannelResponse](
-    method="POST",
-    path="/v1/source-management/channel/catalog",
-    operation_id="source_channel_catalog",
-    request_type=SourceChannelRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=SourceChannelResponse,
-    success_status=200,
-    summary="Source manager reverse channel catalog",
-    tags=("source-management-channel",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Channel exchange."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(
-        action=None, resource=None, scope_id_field=None, resolver="source_management_channel_access"
-    ),
-)
-
-SOURCE_CHANNEL_POLL = Operation[SourceChannelRequest, SourceChannelResponse](
-    method="POST",
-    path="/v1/source-management/channel/poll",
-    operation_id="source_channel_poll",
-    request_type=SourceChannelRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=SourceChannelResponse,
-    success_status=200,
-    summary="Source manager reverse channel poll",
-    tags=("source-management-channel",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Channel exchange."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(
-        action=None, resource=None, scope_id_field=None, resolver="source_management_channel_access"
-    ),
-)
-
-SOURCE_CHANNEL_REPLY = Operation[SourceChannelRequest, SourceChannelResponse](
-    method="POST",
-    path="/v1/source-management/channel/reply",
-    operation_id="source_channel_reply",
-    request_type=SourceChannelRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=SourceChannelResponse,
-    success_status=200,
-    summary="Source manager reverse channel reply",
-    tags=("source-management-channel",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Channel exchange."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(
-        action=None, resource=None, scope_id_field=None, resolver="source_management_channel_access"
-    ),
-)
-
-SOURCE_CHANNEL_CLOSE = Operation[SourceChannelRequest, SourceChannelResponse](
-    method="POST",
-    path="/v1/source-management/channel/close",
-    operation_id="source_channel_close",
-    request_type=SourceChannelRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=SourceChannelResponse,
-    success_status=200,
-    summary="Source manager reverse channel close",
-    tags=("source-management-channel",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Channel exchange."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(
-        action=None, resource=None, scope_id_field=None, resolver="source_management_channel_access"
-    ),
-)
-
-SOURCE_INSTANCE_EXCHANGE = Operation[SourceInstanceExchangeRequest, SourceInstanceExchangeResponse](
-    method="POST",
-    path="/v1/source-management/instances/{instance_id}/{operation}",
-    operation_id="source_instance_exchange",
-    request_type=SourceInstanceExchangeRequest,
-    request_location="body",
-    path_parameters=("instance_id", "operation"),
-    response_type=SourceInstanceExchangeResponse,
-    success_status=200,
-    summary="Authenticated instance control, permission checks and durable result exchange",
-    tags=("source-management-instance",),
-    scope_mode="none",
-    responses={
-        200: {"description": "Instance control exchange."},
-        400: {"$ref": "#/components/responses/BadRequest"},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        409: {"$ref": "#/components/responses/Conflict"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(
-        action=None, resource=None, scope_id_field=None, resolver="source_instance_channel_access"
-    ),
-)
-
-PLAN_ACCESS_OWNERSHIP = Operation[PlanAccessOwnershipRequest, AccessOwnershipPlan](
-    method="POST",
-    path="/v1/access/ownership/plan",
-    operation_id="plan_access_ownership",
-    request_type=PlanAccessOwnershipRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=AccessOwnershipPlan,
-    success_status=200,
-    summary="Inventory ownership data missing after switching Access enforcement on",
-    tags=("access",),
-    scope_mode="none",
-    responses={
-        200: {"description": "The missing-attribution inventory for the requested Scopes."},
-        401: {"$ref": "#/components/responses/Unauthorized"},
-        403: {"$ref": "#/components/responses/Forbidden"},
-        422: {"$ref": "#/components/responses/InvalidRequest"},
-        503: {"$ref": "#/components/responses/Unavailable"},
-    },
-    access=AccessRequirement(action="access.self", resource="server", scope_id_field=None, resolver="static"),
-)
-
-APPLY_ACCESS_OWNERSHIP = Operation[ApplyAccessOwnershipRequest, AccessOwnershipApplyResult](
-    method="POST",
-    path="/v1/access/ownership/apply",
-    operation_id="apply_access_ownership",
-    request_type=ApplyAccessOwnershipRequest,
-    request_location="body",
-    path_parameters=(),
-    response_type=AccessOwnershipApplyResult,
-    success_status=200,
-    summary="Backfill missing Artifact owners and Candidate owner attestations",
-    tags=("access",),
-    scope_mode="none",
-    responses={
-        200: {"description": "The applied, or, in dry-run, previewed ownership backfill."},
         401: {"$ref": "#/components/responses/Unauthorized"},
         403: {"$ref": "#/components/responses/Forbidden"},
         422: {"$ref": "#/components/responses/InvalidRequest"},
