@@ -171,6 +171,7 @@ from powercontext.builtin.runtime.context_pack import (
     ContextPackDelta,
     ContextPackError,
 )
+from powercontext.builtin.runtime.count_trigger import SourceCountTrigger
 from powercontext.builtin.runtime.decision_model import DecisionModel
 from powercontext.builtin.runtime.errors import InvalidRuntimeRequestError, TopicMemoryProcessingUnavailableError
 from powercontext.builtin.runtime.models import (
@@ -493,23 +494,26 @@ class ScopedSourceApplication:
                             span.set_attributes({_MEMORY_CAPTURE_SOURCE_COUNT: 1})
             except BaseValueConflictError as error:
                 raise SourceConflictError("identity", error.identity) from None
-            return SourceReceipt(
+            receipt = SourceReceipt(
                 source_ref=SourceRef(source_type=record.source_type, source_id=record.source_id),
                 sequence=record.position,
             )
-        async with self._runtime._context(self.scope_id) as context:
-            with self._runtime._stage(_MEMORY_CAPTURE_STAGE, attributes={}) as span:
-                source, sequence = await context.sources.capture(
-                    ContentCapture(
-                        source_id=value.source_id,
-                        content=value.content,
-                        metadata=value.model_dump(mode="json")["metadata"],
-                    ),
-                    handoff_receipt=handoff_receipt,
-                )
-                if span is not None:
-                    span.set_attributes({_MEMORY_CAPTURE_SOURCE_COUNT: 1})
-            return SourceReceipt(source_ref=context.sources.catalog.as_ref(source), sequence=sequence)
+        else:
+            async with self._runtime._context(self.scope_id) as context:
+                with self._runtime._stage(_MEMORY_CAPTURE_STAGE, attributes={}) as span:
+                    source, sequence = await context.sources.capture(
+                        ContentCapture(
+                            source_id=value.source_id,
+                            content=value.content,
+                            metadata=value.model_dump(mode="json")["metadata"],
+                        ),
+                        handoff_receipt=handoff_receipt,
+                    )
+                    if span is not None:
+                        span.set_attributes({_MEMORY_CAPTURE_SOURCE_COUNT: 1})
+                receipt = SourceReceipt(source_ref=context.sources.catalog.as_ref(source), sequence=sequence)
+        self._runtime._notify_count_trigger(self.scope_id)
+        return receipt
 
 
 class SourceApplication:
@@ -536,11 +540,13 @@ class ScopedRecordApplication:
         /,
     ) -> SourceRecord:
         async with self._runtime._scope_operation(self.scope_id), self._runtime._locked(self.scope_id):
-            return await self._runtime._records().create_source(
+            record = await self._runtime._records().create_source(
                 self.scope_id,
                 source_type,
                 content,
             )
+        self._runtime._notify_count_trigger(self.scope_id)
+        return record
 
     async def get_source(self, source_type: str, source_id: str, /) -> SourceRecord:
         async with self._runtime._scope_operation(self.scope_id):
@@ -568,7 +574,9 @@ class ScopedRecordApplication:
         /,
     ) -> ArtifactCreated:
         async with self._runtime._scope_operation(self.scope_id), self._runtime._locked(self.scope_id):
-            return await self._runtime._records().create_artifact(self.scope_id, family, write)
+            created = await self._runtime._records().create_artifact(self.scope_id, family, write)
+        self._runtime._notify_count_trigger(self.scope_id)
+        return created
 
     async def get_artifact(self, family: str, artifact_id: str, /) -> ArtifactRecord:
         async with self._runtime._scope_operation(self.scope_id):
@@ -3008,6 +3016,8 @@ class BuiltinRuntime:
         capabilities: RuntimeCapabilities,
         code_service: CodeService | None = None,
         source_window_limit: int = 100,
+        memory_source_count_threshold: int | None = None,
+        topic_memory_source_count_threshold: int | None = None,
         context_assembly_max_entries: int = 8,
         recall_sufficiency_policy: RecallSufficiencyPolicy | None = None,
         scope_cache_size: int = DEFAULT_SCOPE_CACHE_SIZE,
@@ -3112,6 +3122,9 @@ class BuiltinRuntime:
         self._scheduled_source_runner = scheduled_source_runner
         self._scheduled_experience_runner = scheduled_experience_runner
         self.source_window_limit = source_window_limit
+        self.memory_source_count_threshold = memory_source_count_threshold
+        self.topic_memory_source_count_threshold = topic_memory_source_count_threshold
+        self._count_trigger = SourceCountTrigger(self)
         self.context_assembly_max_entries = context_assembly_max_entries
         self.recall_sufficiency_policy = recall_sufficiency_policy
         self._scope_cache = ScopeCache(
@@ -3286,6 +3299,16 @@ class BuiltinRuntime:
             self._dream_service.authorization_context = context
             self._dream_service.attest_candidate = attest_candidate
 
+    def _notify_count_trigger(self, scope_id: str, /) -> None:
+        """Re-check count thresholds for one scope after a journal write."""
+
+        self._count_trigger.notify(scope_id)
+
+    def _start_count_triggers(self) -> None:
+        """Re-check every journaled scope once, for work left by a restart."""
+
+        self._count_trigger.start_scan()
+
     async def close(self) -> None:
         """Stop accepting work and await in-flight operations without closing the provider."""
 
@@ -3297,6 +3320,7 @@ class BuiltinRuntime:
             async with self._lifecycle:
                 self._closing = True
                 await self._lifecycle.wait_for(lambda: self._active_operations == 0)
+            await self._count_trigger.shutdown()
             if self.artifact_processing_supervisor is not None:
                 await self.artifact_processing_supervisor.close()
             async with self._processor_lock:

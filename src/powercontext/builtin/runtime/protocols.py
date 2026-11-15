@@ -70,6 +70,10 @@ class PowerContextProvider(Protocol[SourcesT, ArtifactsT, TriggersT]):
 
     async def get(self, scope_id: str, /) -> PowerContext[SourcesT, ArtifactsT, TriggersT]: ...
 
+    async def scope_ids(self) -> tuple[str, ...]: ...
+
+    async def pending_source_count(self, scope_id: str, binding_name: str, /) -> int: ...
+
 
 class RemoteIngestion(Protocol):
     """Server-side authority used by independent Connector workers."""

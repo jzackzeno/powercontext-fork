@@ -1338,6 +1338,21 @@ class RelationalContexts:
             ).scalars()
             return tuple(str(value) for value in values)
 
+    async def pending_source_count(self, scope_id: str, binding_name: str, /) -> int:
+        """Count journal entries after one Family's last successful cursor.
+
+        The count is journal identity, not content: duplicate captures share
+        one journal position, and lineage-only entries occupy a position, so
+        both are counted exactly as the count trigger specifies.
+        """
+
+        scope = validate_scope_id(scope_id)
+        async with self.database.transaction() as connection:
+            head = await self.repositories.sources.journal_position(connection, scope)
+            stored = await self.repositories.cursors.load(connection, scope, binding_name)
+            sequence = 0 if stored is None else stored.cursor.sequence
+            return max(0, head - sequence)
+
     async def handoff_scope_ids(self) -> tuple[str, ...]:
         """Return scopes with a committed Handoff head, in deterministic order."""
 
