@@ -24,9 +24,6 @@ from powercontext.server.dashboard.errors import ReadError
 COMMON = {"scope", "period", "lang", "theme"}
 HISTORY = {"view", "profile_cursor", "profile_history"}
 COLLECTION = {"cursor", "handoff_history"}
-METHODS = {"kind", "q", "experience_page", "skill_page"}
-# A 2,000-character query can expand to 24 KiB when percent encoded.
-METHODS_RETURN_MAX = 32 * 1024
 
 
 def positive_revision(raw: str | None) -> int:
@@ -39,19 +36,15 @@ def _has_controls(value: str) -> bool:
     return any(ord(char) < 32 or ord(char) == 127 for char in value)
 
 
-def _parameters(
-    raw: str, maximum: int, *, backslash_values: frozenset[str] = frozenset()
-) -> tuple[str, dict[str, str]]:
-    if len(raw.encode()) > maximum or _has_controls(raw):
+def _parameters(raw: str, maximum: int) -> tuple[str, dict[str, str]]:
+    if len(raw.encode()) > maximum or _has_controls(raw) or "\\" in raw:
         raise ValueError
     url = urlsplit(raw)
-    if url.scheme or url.netloc or url.fragment or not url.path.startswith("/dashboard/") or "\\" in url.path:
+    if url.scheme or url.netloc or url.fragment or not url.path.startswith("/dashboard/"):
         raise ValueError
     pairs = parse_qsl(url.query, keep_blank_values=True, max_num_fields=12, errors="strict")
     params = dict(pairs)
-    if len(params) != len(pairs) or any(
-        _has_controls(value) or ("\\" in value and key not in backslash_values) for key, value in params.items()
-    ):
+    if len(params) != len(pairs) or any(_has_controls(value) or "\\" in value for value in params.values()):
         raise ValueError
     scope = params.get("scope", "")
     if not scope.strip() or len(scope) > 256:
@@ -80,47 +73,22 @@ def _validate_history(params: dict[str, str]) -> None:
             raise ValueError
 
 
-def _validate_methods(params: dict[str, str]) -> None:
-    if params.get("kind", "experience") not in {"experience", "skill"}:
-        raise ValueError
-    for key in ("experience_page", "skill_page"):
-        if key in params and (not params[key].isascii() or not params[key].isdecimal() or int(params[key]) < 1):
-            raise ValueError
-
-
 def collection_return(raw: str | None, scope: str, *, page: str | None = None) -> str | None:
     if not raw:
         return None
     try:
-        if page == "methods":
-            path, params = _parameters(raw, METHODS_RETURN_MAX, backslash_values=frozenset({"q"}))
-        else:
-            path, params = _parameters(raw, 8192)
+        path, params = _parameters(raw, 8192)
         if params["scope"] != scope or (page and path != f"/dashboard/{page}"):
             return None
-        if page == "methods":
-            if params.keys() - (COMMON | METHODS):
-                return None
-            _validate_methods(params)
-        else:
-            allowed = COMMON | COLLECTION if path == "/dashboard/handoff" else COMMON | HISTORY
-            if path not in {"/dashboard/handoff", "/dashboard/profile"} or params.keys() - allowed:
-                return None
-            if path == "/dashboard/profile" and params.get("view") != "history":
-                return None
-            _validate_history(params)
+        allowed = COMMON | COLLECTION if path == "/dashboard/handoff" else COMMON | HISTORY
+        if path not in {"/dashboard/handoff", "/dashboard/profile"} or params.keys() - allowed:
+            return None
+        if path == "/dashboard/profile" and params.get("view") != "history":
+            return None
+        _validate_history(params)
     except (ValueError, UnicodeError):
         return None
     return path + "?" + urlencode(params)
-
-
-def with_language(destination: str, language: str) -> str:
-    """Apply the current interface language to a validated return destination."""
-
-    url = urlsplit(destination)
-    params = dict(parse_qsl(url.query, keep_blank_values=True))
-    params["lang"] = language
-    return url.path + "?" + urlencode(params)
 
 
 def _reading_fields(path: str, params: dict[str, str]) -> set[str]:
@@ -143,11 +111,7 @@ def reading_return(raw: str | None) -> str | None:
         return None
     try:
         path, params = _parameters(raw, 16384)
-        if path == "/dashboard/home":
-            if params.keys() - COMMON:
-                return None
-            return path + "?" + urlencode(params)
-        if path not in {"/dashboard/profile", "/dashboard/handoff-detail", "/dashboard/notes"}:
+        if path not in {"/dashboard/profile", "/dashboard/handoff-detail"}:
             return None
         allowed = COMMON | {"revision", "return_to"}
         allowed |= _reading_fields(path, params)
@@ -185,19 +149,14 @@ def request_reading_return(request: Request) -> str | None:
                 return None
             path = "/dashboard/profile"
             keys = ("scope", "period", "lang", "theme", "revision", "return_to")
-        elif origin in {"handoff-detail", "notes"}:
-            path = f"/dashboard/{origin}"
+        elif origin == "handoff-detail":
+            path = "/dashboard/handoff-detail"
             keys = ("scope", "period", "lang", "theme", "artifact", "revision", "return_to")
         else:
             return None
         return reading_return(path + "?" + urlencode({key: query[key] for key in keys if key in query}))
     if path == "/dashboard/handoff-download":
         path = "/dashboard/handoff-detail"
-    if path == "/dashboard/notes":
-        keys = ("scope", "period", "lang", "theme", "artifact", "revision", "return_to")
-        return reading_return(
-            path + "?" + urlencode({key: request.query_params[key] for key in keys if key in request.query_params})
-        )
     return reading_return(path + "?" + str(request.query_params))
 
 

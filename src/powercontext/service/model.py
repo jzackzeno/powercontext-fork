@@ -27,21 +27,6 @@ DEFINITION_VERSION = 2
 OWNERSHIP_MARKER = "powercontext.personal-server"
 
 
-@dataclass(frozen=True)
-class ServiceTarget:
-    """Exact Server resource identity supplied by a trusted distribution caller."""
-
-    python_executable: str
-    package_version: str
-    isolated_runtime: bool = False
-
-    def __post_init__(self) -> None:
-        if not Path(self.python_executable).is_absolute() or not self.package_version.strip():
-            raise ValueError("a service target requires an absolute executable and package version")  # noqa: TRY003
-        if type(self.isolated_runtime) is not bool:
-            raise TypeError("isolated_runtime must be a boolean")  # noqa: TRY003
-
-
 class SupportState(StrEnum):
     SUPPORTED = "supported"
     UNSUPPORTED = "unsupported"
@@ -132,18 +117,12 @@ class ServiceDefinition:
     data_dir: str
     env_file: EnvironmentFileIdentity | None = None
     start_on_login: bool = True
-    isolated_runtime: bool = False
-    observability_home: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         payload = asdict(self)
-        if self.observability_home is None:
-            payload.pop("observability_home", None)
         # Omit the default so definitions written before this option was added remain byte-for-byte valid.
         if self.start_on_login:
             payload.pop("start_on_login", None)
-        if not self.isolated_runtime:
-            payload.pop("isolated_runtime", None)
         environment = payload.get("env_file")
         if isinstance(environment, dict) and environment.get("owner_sid") is None:
             # POSIX identities do not have a Windows owner SID. Keep their metadata compatible with older files.
@@ -164,7 +143,7 @@ class ServiceDefinition:
             "data_dir",
             "env_file",
         }
-        if set(payload) - {"start_on_login", "isolated_runtime", "observability_home"} != expected:
+        if set(payload) not in (expected, expected | {"start_on_login"}):
             raise ValueError("service definition fields do not match the supported contract")  # noqa: TRY003
         environment = payload["env_file"]
         env_file = None
@@ -185,9 +164,6 @@ class ServiceDefinition:
         start_on_login = payload.get("start_on_login", True)
         if not isinstance(start_on_login, bool):
             raise TypeError("service definition field 'start_on_login' must be a boolean")  # noqa: TRY003
-        isolated_runtime = payload.get("isolated_runtime", False)
-        if type(isolated_runtime) is not bool:
-            raise TypeError("service definition field 'isolated_runtime' must be a boolean")  # noqa: TRY003
         return cls(
             ownership=_required_string(payload, "ownership"),
             definition_version=_required_int(payload, "definition_version"),
@@ -197,8 +173,6 @@ class ServiceDefinition:
             data_dir=_required_string(payload, "data_dir"),
             env_file=env_file,
             start_on_login=start_on_login,
-            isolated_runtime=isolated_runtime,
-            observability_home=_optional_observability_home(payload),
         )
 
     def launcher_arguments(
@@ -209,9 +183,6 @@ class ServiceDefinition:
     ) -> list[str]:
         arguments = [
             self.python_executable,
-            # Managed resource files are immutable and must not import code
-            # from the user's site packages, working directory or PYTHONPATH.
-            *(["-I", "-B"] if self.isolated_runtime else []),
             "-m",
             module,
             "--endpoint",
@@ -219,8 +190,6 @@ class ServiceDefinition:
             "--data-dir",
             self.data_dir,
         ]
-        if self.observability_home is not None:
-            arguments.extend(("--observability-home", self.observability_home))
         if self.env_file is not None:
             arguments.extend(("--env-file", self.env_file.path))
             if include_env_identity:
@@ -367,13 +336,5 @@ __all__ = [
     "ServiceDefinition",
     "ServiceError",
     "ServiceStatus",
-    "ServiceTarget",
     "SupportState",
 ]
-
-
-def _optional_observability_home(payload: dict[str, object]) -> str | None:
-    value = payload.get("observability_home")
-    if value is not None and (not isinstance(value, str) or not Path(value).is_absolute()):
-        raise ValueError("service observability home must be an absolute path")  # noqa: TRY003
-    return value

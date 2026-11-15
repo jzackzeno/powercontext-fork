@@ -25,9 +25,7 @@ from pathlib import Path
 from typing import TextIO
 from urllib.parse import urlsplit
 
-from powercontext.env_file import environment_context
 from powercontext.server.configuration import ServerConfigurationError, server_settings_context
-from powercontext.server.settings import ServerLoggingConfig
 from powercontext.service.environment import ProtectedEnvironmentFileError, load_protected_environment_file
 from powercontext.service.model import EnvironmentFileIdentity, ProbeState
 from powercontext.service.probe import probe_server
@@ -57,7 +55,6 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--endpoint", required=True)
     parser.add_argument("--data-dir", required=True, type=Path)
     parser.add_argument("--env-file", type=Path)
-    parser.add_argument("--observability-home", type=Path)
     parser.add_argument("--env-file-device", type=int)
     parser.add_argument("--env-file-inode", type=int)
     parser.add_argument("--env-file-size", type=int)
@@ -75,25 +72,7 @@ def main(arguments: list[str] | None = None) -> int:
             if options.env_file is not None:
                 identity = _environment_identity(options)
                 environment = load_protected_environment_file(options.env_file, expected=identity).values
-            observability_environment = (
-                {"POWERCONTEXT_OBSERVABILITY_HOME": str(options.observability_home)}
-                if options.observability_home is not None
-                else {}
-            )
-            with (
-                environment_context(observability_environment, override=True),
-                server_settings_context(
-                    environment=environment,
-                    data_dir=options.data_dir,
-                    observability=options.observability_home is not None,
-                ) as settings,
-            ):
-                if settings.http.uds is not None:
-                    raise ServerConfigurationError(  # noqa: TRY301
-                        ValueError(
-                            "personal services require a TCP Server listener; use 'powercontext server run' for UDS"
-                        )
-                    )
+            with server_settings_context(environment=environment, data_dir=options.data_dir) as settings:
                 expected = _endpoint(settings.http.host, settings.http.port)
                 if expected != options.endpoint or not is_loopback_host(settings.http.host):
                     logger.error(
@@ -110,7 +89,6 @@ def main(arguments: list[str] | None = None) -> int:
                 # Help and preflight exits do not need the Server runtime dependencies.
                 from powercontext.server import cli as server_cli
 
-                settings.logging = _service_logging(settings.logging, redirected=options.stdout is not None)
                 server_cli._run_configured_server(settings)
                 return 0
     except (ProtectedEnvironmentFileError, ServerConfigurationError) as error:
@@ -124,14 +102,6 @@ def main(arguments: list[str] | None = None) -> int:
     except Exception:
         logger.exception("PowerContext personal service failed")
         return 1
-
-
-def _service_logging(config: ServerLoggingConfig, *, redirected: bool) -> ServerLoggingConfig:
-    """Give file-backed native services bounded logs without duplicating stdout."""
-
-    if not redirected and sys.platform != "darwin":
-        return config
-    return config if "file" in config.model_fields_set else config.model_copy(update={"file": True})
 
 
 def _environment_identity(options: argparse.Namespace) -> EnvironmentFileIdentity:

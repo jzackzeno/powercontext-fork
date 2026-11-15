@@ -17,15 +17,6 @@
 import json
 from typing import Any
 
-from powercontext.server.dashboard.errors import ReadError
-
-
-def set_scope(ctx, descriptor):
-    if descriptor is None:
-        raise ReadError(404, "not_found")
-    ctx["scope_descriptor"] = {name: descriptor[name] for name in ("scope_id", "title", "summary", "parent_scope_id")}
-    ctx["data"].update(title=descriptor["title"], summary=descriptor["summary"])
-
 
 def source_view(source: dict[str, Any] | None) -> dict[str, Any] | None:
     if source is None:
@@ -38,34 +29,7 @@ def source_view(source: dict[str, Any] | None) -> dict[str, Any] | None:
 
 
 def memory_view(response: dict[str, Any]) -> list[dict[str, Any]]:
-    """Keep the independent Artifact identity of each Atomic Memory record."""
-
-    return [
-        {
-            **item,
-            **item["artifact"],
-            "note_key": f"atomic-memory/{item['artifact']['artifact_id']}@{item['artifact']['revision']}",
-        }
-        for item in response["items"]
-    ]
-
-
-def artifact_destination(ctx, ref, *, scope=None, return_to=None):
-    """Link an immutable Artifact reference to its existing family reader."""
-    family = ref["family"]
-    params = {"scope": scope or ctx["scope"], "lang": ctx["language"]}
-    if return_to:
-        params["return_to"] = return_to
-    if family == "topic-memory":
-        return ctx["link"]("topics", topic_artifact=ref["artifact_id"], topic_revision=ref["revision"], **params)
-    if family == "profile":
-        return ctx["link"]("profile", revision=ref["revision"], **params)
-    if family == "prompt":
-        return ctx["link"]("prompts", prompt_key=ref["artifact_id"], prompt_revision=ref["revision"], **params)
-    page = {"atomic-memory": "notes", "experience": "experience", "skill": "skill", "handoff": "handoff-detail"}.get(
-        family
-    )
-    return ctx["link"](page, artifact=ref["artifact_id"], revision=ref["revision"], **params) if page else None
+    return [{**entry, **entry["citation"]} for entry in response["entries"]]
 
 
 def usage_view(usage: dict[str, Any], recall: dict[str, Any]) -> dict[str, Any]:

@@ -24,7 +24,7 @@ limitations under the License.
 <article class="reading-sheet">
   <div>
   <div class="reading-heading">
-    <a class="back-link d-block mb-4" href="{{ return_to or link('methods') }}">← {{ t.back_methods }}</a>
+    <a class="back-link d-block mb-4" href="{{ link('methods') }}">← {{ t.back_methods }}</a>
     <span class="method-type text-secondary small">{{ t.experience }} · {{ data.title }}</span>
     <h1>{{ data.experience.lesson }}</h1>
   </div>
@@ -32,13 +32,12 @@ limitations under the License.
       {% for field in ['situation', 'action', 'outcome'] %}
       <section><h2>{{ t[field] }}</h2><p>{{ data.experience[field] }}</p></section>
       {% endfor %}
-<details class="supporting-details"><summary>{{ t.source_references }}</summary>      {% call record_references(data.experience, 'experience') %}
+      {% call record_references(data.experience, 'experience') %}
         {% include 'components/record-sources.html' %}
-      {% endcall %}</details>
+      {% endcall %}
     </div>
   </div>
 </article>
-{% include 'components/revision-history.html' %}
 {% include 'components/evidence-modal.html' %}
 {% endif %}
 

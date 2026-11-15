@@ -34,14 +34,12 @@ limitations under the License.
       <section><h2>{{ t.recorded_state }}</h2><ul>{% for statement in data.handoff.state %}<li>{{ statement.text }}</li>{% endfor %}</ul></section>
       <section><h2>{{ t.next_action }}</h2><p>{{ data.handoff.next_action.text if data.handoff.next_action else t.no_next_action }}</p></section>
       <section><h2>{{ t.handoff_omissions }}</h2>{% if data.handoff.omissions %}<ul>{% for omission in data.handoff.omissions %}<li>{{ omission.text }}</li>{% endfor %}</ul>{% else %}<p>{{ t.no_omissions }}</p>{% endif %}</section>
-{% include 'components/work-followup.html' %}
-<details class="supporting-details"><summary>{{ t.source_references }}</summary>      {% call record_references(data.handoff, 'handoff') %}
+      {% call record_references(data.handoff, 'handoff') %}
         {% include 'components/record-sources.html' %}
-      {% endcall %}</details>
+      {% endcall %}
     </div>
   </div>
 </article>
-{% include 'components/revision-history.html' %}
 {% include 'components/evidence-modal.html' %}
 {% else %}
 <section class="card"><div class="empty"><h1>{{ t.handoff_empty }}</h1><p>{{ t.handoff_empty_body }}</p></div></section>
