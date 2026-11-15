@@ -27,9 +27,7 @@ from powercontext.builtin.artifacts.handoff.errors import (
     InvalidHandoffGenerationError,
     InvalidHandoffReferenceError,
 )
-from powercontext.builtin.artifacts.handoff.generation import rollover_draft_violation
 from powercontext.builtin.artifacts.handoff.generation_metadata import HandoffGenerationReceipts
-from powercontext.builtin.artifacts.handoff.hints import render_handoff_hint
 from powercontext.builtin.artifacts.handoff.models import (
     Handoff,
     HandoffArtifactCitation,
@@ -42,12 +40,12 @@ from powercontext.builtin.artifacts.handoff.models import (
     HandoffEvidenceCheck,
     HandoffGenerationEvidence,
     HandoffGenerationRequest,
+    HandoffMemoryCitation,
     HandoffResolution,
     HandoffResolutionSelection,
     HandoffSourceCitation,
     PreparedHandoff,
     PrepareHandoff,
-    PrepareHandoffHint,
 )
 from powercontext.builtin.artifacts.handoff.protocols import (
     HandoffBackend,
@@ -56,8 +54,6 @@ from powercontext.builtin.artifacts.handoff.protocols import (
 )
 from powercontext.builtin.artifacts.prompt import PromptError
 from powercontext.builtin.artifacts.prompt.service import ScopedPrompts, current_prompt, prompt_operation
-from powercontext.builtin.processing_diagnostics import observe_processing_failure
-from powercontext.builtin.source_eligibility import SourceNotEligibleError
 from powercontext.errors import RevisionConflictError
 from powercontext.sources import SourceRef
 
@@ -98,15 +94,10 @@ class HandoffService:
         self._generation_pipeline = generation_pipeline
         ArtifactRef(family=Handoff.family, artifact_id=artifact_id, revision=1)
 
+    @prompt_operation("handoff.generate")
     async def prepare(self, action: PrepareHandoff, /) -> HandoffDraft:
         """Generate an inspectable Draft from one standard bounded action."""
-        async with observe_processing_failure(
-            Handoff.family, "handoff.generate", self.scope_id, input_item_count=len(action.evidence)
-        ):
-            return await self._prepare_with_prompt(action)
 
-    @prompt_operation("handoff.generate")
-    async def _prepare_with_prompt(self, action: PrepareHandoff, /) -> HandoffDraft:
         if self._generation_pipeline is None:
             raise HandoffGenerationUnavailableError
         if isinstance(self._evidence_resolver, _BatchHandoffEvidenceResolver):
@@ -116,7 +107,6 @@ class HandoffService:
         draft = await self._generation_pipeline.generate(
             HandoffGenerationRequest(
                 objective=action.objective,
-                rollover_reasons=action.rollover_reasons,
                 evidence=evidence,
                 max_bytes=action.max_bytes,
             )
@@ -134,22 +124,21 @@ class HandoffService:
     async def finalize(self, draft: HandoffDraft, /) -> PreparedHandoff:
         """Finalize inspected content after validating its direct evidence."""
 
-        async with observe_processing_failure(Handoff.family, "handoff.finalize", self.scope_id):
-            content = draft.as_content()
-            if draft.generation is not None:
-                if self._generation_receipts is None:
-                    raise PromptError("invalid_handoff_generation")
-                content = content.model_copy(
-                    update={"generation": self._generation_receipts.verify(self.scope_id, draft.generation, content)}
-                )
-            await self._validate_evidence(content)
-            current = await self._backend.latest(self.artifact_id)
-            return PreparedHandoff(
-                scope_id=self.scope_id,
-                base=None if current is None else current.as_ref(),
-                content=content,
-                generation=draft.generation,
+        content = draft.as_content()
+        if draft.generation is not None:
+            if self._generation_receipts is None:
+                raise PromptError("invalid_handoff_generation")
+            content = content.model_copy(
+                update={"generation": self._generation_receipts.verify(self.scope_id, draft.generation, content)}
             )
+        await self._validate_evidence(content)
+        current = await self._backend.latest(self.artifact_id)
+        return PreparedHandoff(
+            scope_id=self.scope_id,
+            base=None if current is None else current.as_ref(),
+            content=content,
+            generation=draft.generation,
+        )
 
     async def commit(
         self,
@@ -161,34 +150,31 @@ class HandoffService:
     ) -> Handoff:
         """Commit an explicit milestone with no-op and optimistic concurrency semantics."""
 
-        async with observe_processing_failure(
-            Handoff.family, "handoff.commit", self.scope_id, storage_location="handoff-commit-storage"
-        ):
-            self._require_prepared(prepared)
-            if prepared.generation is None:
-                if prepared.content.generation is not None:
-                    raise PromptError("invalid_handoff_generation")
-            else:
-                if self._generation_receipts is None:
-                    raise PromptError("invalid_handoff_generation")
-                metadata = self._generation_receipts.verify(self.scope_id, prepared.generation, prepared.content)
-                prepared = prepared.model_copy(
-                    update={"content": prepared.content.model_copy(update={"generation": metadata})}
-                )
-            current = await self._backend.latest(self.artifact_id)
-            if not force_revision and current is not None and current.content == prepared.content:
-                return current
-
-            self._require_current_base(prepared.base, current)
-            await self._validate_evidence(prepared.content)
-            draft = HandoffArtifactDraft(
-                content=prepared.content,
-                sources=(*additional_sources, *_source_lineage(prepared.content)),
-                artifacts=_artifact_lineage(prepared.content) + _generation_lineage(prepared.content),
+        self._require_prepared(prepared)
+        if prepared.generation is None:
+            if prepared.content.generation is not None:
+                raise PromptError("invalid_handoff_generation")
+        else:
+            if self._generation_receipts is None:
+                raise PromptError("invalid_handoff_generation")
+            metadata = self._generation_receipts.verify(self.scope_id, prepared.generation, prepared.content)
+            prepared = prepared.model_copy(
+                update={"content": prepared.content.model_copy(update={"generation": metadata})}
             )
-            if current is None:
-                return await self._backend.create(self.artifact_id, draft)
-            return await self._backend.revise(current, draft)
+        current = await self._backend.latest(self.artifact_id)
+        if not force_revision and current is not None and current.content == prepared.content:
+            return current
+
+        self._require_current_base(prepared.base, current)
+        await self._validate_evidence(prepared.content)
+        draft = HandoffArtifactDraft(
+            content=prepared.content,
+            sources=(*additional_sources, *_source_lineage(prepared.content)),
+            artifacts=_artifact_lineage(prepared.content) + _generation_lineage(prepared.content),
+        )
+        if current is None:
+            return await self._backend.create(self.artifact_id, draft)
+        return await self._backend.revise(current, draft)
 
     async def latest(self) -> Handoff | None:
         """Return the current committed milestone."""
@@ -292,69 +278,6 @@ class HandoffService:
             ),
         )
 
-    async def hint(self, request: PrepareHandoffHint, /) -> str | None:
-        """Project a selected Handoff without generating, persisting, or truncating history."""
-
-        evidence_scope_id = self.scope_id
-        selected_revision = None
-        if request.prepared is not None:
-            self._require_prepared(request.prepared)
-            content = request.prepared.content
-            current = await self._backend.latest(self.artifact_id)
-        else:
-            selected = (
-                await self.revision(request.revision)
-                if request.revision is not None
-                else await self._backend.latest(self.artifact_id)
-            )
-            if selected is None:
-                return None
-            content = selected.content
-            selected_revision = selected.as_ref()
-            current = selected if request.selection == "latest" else await self._backend.latest(selected.artifact_id)
-            provenance = selected.lineage.publication_source
-            if provenance is not None:
-                evidence_scope_id = provenance.scope_id
-        resolver = self._resolver_for_scope(evidence_scope_id)
-
-        checks = await self._hint_evidence_checks(content, resolver=resolver)
-        if checks is None:
-            return None
-        resolution = HandoffResolution(
-            status="resolved",
-            scope_id=self.scope_id,
-            content=content,
-            selection=request.selection,
-            selected_revision=selected_revision,
-            current_revision=None if current is None else current.as_ref(),
-            evidence_checks=checks,
-        )
-        return render_handoff_hint(
-            resolution,
-            evidence_scope_id=evidence_scope_id,
-            max_bytes=request.max_bytes,
-        )
-
-    async def _hint_evidence_checks(
-        self,
-        content: HandoffContent,
-        *,
-        resolver: HandoffEvidenceResolver,
-    ) -> tuple[HandoffEvidenceCheck, ...] | None:
-        """Require complete evidence, including omission citations, before exposing orientation."""
-
-        try:
-            checks = await self._evidence_checks(content, evidence_resolver=resolver, evidence_authorizer=None)
-            if any(check.status == "unavailable" for check in checks):
-                return None
-            for omission in content.omissions:
-                if omission.citation is None:
-                    continue
-                await resolver.validate(omission.citation)
-        except (HandoffEvidenceUnavailableError, SourceNotEligibleError):
-            return None
-        return checks
-
     def _resolver_for_scope(self, scope_id: str) -> HandoffEvidenceResolver:
         if scope_id == self.scope_id:
             return self._evidence_resolver
@@ -412,8 +335,6 @@ class HandoffService:
         content_bytes = len(draft.as_content().model_dump_json(by_alias=True, indent=2).encode())
         if content_bytes > action.max_bytes:
             raise InvalidHandoffGenerationError("budget")
-        if action.rollover_reasons and (violation := rollover_draft_violation(draft)):
-            raise InvalidHandoffGenerationError(violation)
 
     async def _evidence_checks(
         self,
@@ -500,6 +421,13 @@ def _source_lineage(content: HandoffContent) -> tuple[SourceRef, ...]:
 def _artifact_lineage(content: HandoffContent) -> tuple[ArtifactRef, ...]:
     artifacts: list[ArtifactRef] = []
     for citation in _direct_citations(content):
-        if isinstance(citation, HandoffArtifactCitation) and citation.artifact_ref not in artifacts:
-            artifacts.append(citation.artifact_ref)
+        reference = (
+            citation.artifact_ref
+            if isinstance(citation, HandoffArtifactCitation)
+            else citation.memory_citation.memory_ref
+            if isinstance(citation, HandoffMemoryCitation)
+            else None
+        )
+        if reference is not None and reference not in artifacts:
+            artifacts.append(reference)
     return tuple(artifacts)

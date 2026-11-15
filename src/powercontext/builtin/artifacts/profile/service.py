@@ -53,12 +53,6 @@ from powercontext.builtin.persistence.processing_intents import ArtifactProcessi
 from powercontext.builtin.persistence.profile import ProfilePolicyRepository
 from powercontext.builtin.persistence.sources import SourceRepository
 from powercontext.builtin.persistence.tables import PROFILE_POLICIES_TABLE
-from powercontext.builtin.processing_diagnostics import (
-    ProcessingDiagnostics,
-    ProcessingFailureReason,
-    ProcessingStage,
-    attach_diagnostics,
-)
 from powercontext.builtin.records import BaseValueConflictError, BaseValueNotFoundError
 from powercontext.builtin.scope.errors import ScopeNotFoundError
 from powercontext.builtin.scope.repository import ScopeRepository
@@ -139,9 +133,6 @@ class RelationalProfileService:
             async with self.database.transaction() as connection:
                 if await ScopeRepository().get(connection, scope_id) is None:
                     raise ScopeNotFoundError(scope_id)
-                intents = ArtifactProcessingIntentRepository()
-                await intents.ensure(connection, scope_id, PROFILE_SOURCE_WINDOW_BINDING)
-                await intents.load(connection, scope_id, PROFILE_SOURCE_WINDOW_BINDING, for_update=True)
                 current = await self.policies.get(connection, scope_id, for_update=True)
                 if current is None:
                     if expected_version != 0:
@@ -272,16 +263,7 @@ class RelationalProfileService:
                 except ValueError as error:
                     from powercontext.builtin.inference import InvalidInferenceOutputError
 
-                    raise attach_diagnostics(
-                        InvalidInferenceOutputError("profile-generate", "invalid Markdown"),
-                        ProcessingDiagnostics(
-                            stage=ProcessingStage.BUSINESS_VALIDATION,
-                            reason=ProcessingFailureReason.INVALID_OUTPUT,
-                            input_item_count=len(evidence),
-                            failure_location="profile-generate-markdown",
-                            cause_exception_type=type(error).__name__,
-                        ),
-                    ) from error
+                    raise InvalidInferenceOutputError("profile-generate", "invalid Markdown") from error
                 if current is not None and current.content.content == markdown:
                     markdown = None
         try:

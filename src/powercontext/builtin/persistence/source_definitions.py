@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Immutable historical manifests owned by the Source registration boundary."""
+"""Persistence for worker-owned Source Definition manifests."""
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Mapping
-from functools import lru_cache
 from typing import Any
 
 from sqlalchemy import insert, select
@@ -28,32 +26,15 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from powercontext.builtin.persistence.codec import dump_model, load_model, stored_bytes
 from powercontext.builtin.persistence.errors import (
     IdentityMismatchError,
-    InvalidStoredColumnError,
-    InvalidStoredPayloadError,
     RepositoryNotFoundError,
     StoredPayloadConflictError,
 )
 from powercontext.builtin.persistence.tables import SOURCE_DEFINITION_MANIFESTS_TABLE
-from powercontext.builtin.sources.content import CONTENT_SOURCE_DEFINITION
-from powercontext.sources import SourceDefinition, SourceDefinitionManifest
-from powercontext.sources.evidence import log_evidence_neutralized
-from powercontext.sources.observations import _manifest_for_definition
-
-
-@lru_cache(maxsize=1)
-def _builtin_content_manifest() -> SourceDefinitionManifest:
-    """Reuse only the package-owned, fixed Content Source definition."""
-    return _manifest_for_definition(CONTENT_SOURCE_DEFINITION, transport=False)
-
-
-@lru_cache(maxsize=1)
-def _builtin_content_manifest_payload() -> bytes:
-    manifest = _builtin_content_manifest()
-    return dump_model(manifest, kind="source-definition-manifest", name=manifest.name)
+from powercontext.sources import SourceDefinitionManifest
 
 
 class SourceDefinitionManifestRepository:
-    """Retain native and worker manifests without changing their identities."""
+    """Register immutable worker-owned Definition manifests by name and version."""
 
     async def register(
         self,
@@ -78,49 +59,13 @@ class SourceDefinitionManifestRepository:
             )
         except IntegrityError:
             existing = await self.find(connection, manifest.name, manifest.version)
-            if existing is None:
-                raise
-            if existing != manifest:
+            if existing is None or existing != manifest:
                 raise StoredPayloadConflictError(
                     "source-definition-manifest",
                     (manifest.name, manifest.version),
                 ) from None
             return existing
         return manifest
-
-    async def register_native(
-        self,
-        connection: AsyncConnection,
-        definition: SourceDefinition[Any, Any, Any],
-        /,
-    ) -> SourceDefinitionManifest | None:
-        """Retain the existing manifest representation for trusted native material.
-
-        This internal registration cannot replace an older manifest. A missing,
-        invalid or conflicting ancillary manifest leaves the Source declaration
-        neutral; database failures still abort the caller's transaction. External
-        registration keeps its existing active-Definition ownership guard.
-        """
-
-        try:
-            if definition is CONTENT_SOURCE_DEFINITION:
-                # The nested schema dictionaries are mutable despite the frozen
-                # model. Never expose the cached instance to a caller.
-                manifest = _builtin_content_manifest().model_copy(deep=True)
-            else:
-                manifest = _manifest_for_definition(definition, transport=False)
-        except Exception:  # Native schema providers may not expose a valid manifest.
-            log_evidence_neutralized("no_manifest", unit="manifest")
-            return None
-        try:
-            return await self.register(connection, manifest)
-        except StoredPayloadConflictError:
-            # Two manifests exist under one identity; evidence cannot choose either.
-            log_evidence_neutralized("manifest_conflict", unit="manifest", level=logging.WARNING)
-            return None
-        except (IdentityMismatchError, InvalidStoredColumnError, InvalidStoredPayloadError):
-            log_evidence_neutralized("digest_mismatch", unit="manifest", level=logging.WARNING)
-            return None
 
     async def get(
         self,
@@ -160,19 +105,12 @@ def _decode_row(row: Mapping[Any, Any]) -> SourceDefinitionManifest:
     name = str(row["definition_name"])
     version = str(row["definition_version"])
     fingerprint = str(row["fingerprint"])
-    payload = stored_bytes(row["manifest"], column="manifest")
-    if name == CONTENT_SOURCE_DEFINITION.name and payload == _builtin_content_manifest_payload():
-        # Equality with the already validated, package-owned bytes proves the
-        # payload, not the database row. Check all indexed identities below and
-        # return a fresh nested schema so callers cannot mutate the cache.
-        manifest = _builtin_content_manifest().model_copy(deep=True)
-    else:
-        manifest = load_model(
-            SourceDefinitionManifest,
-            payload,
-            kind="source-definition-manifest",
-            name=name,
-        )
+    manifest = load_model(
+        SourceDefinitionManifest,
+        stored_bytes(row["manifest"], column="manifest"),
+        kind="source-definition-manifest",
+        name=name,
+    )
     indexed = (name, version, fingerprint)
     decoded = (manifest.name, manifest.version, manifest.fingerprint)
     if indexed != decoded:

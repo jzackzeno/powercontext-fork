@@ -114,6 +114,9 @@ class SourceCursorRepository:
             raise InvalidRepositoryArgumentError("expected_generation", "must be positive")
         payload = dump_model(cursor, kind="source-cursor", name=binding_name)
         if expected_generation is None:
+            existing = await self.load(connection, scope_id, binding_name)
+            if existing is not None:
+                raise GenerationConflictError(binding_name, None, existing.generation)
             generation = 1
             created = await _insert_if_absent(
                 connection,
@@ -123,8 +126,9 @@ class SourceCursorRepository:
                 generation=generation,
             )
             if not created:
-                # The unique constraint is the initial-generation CAS. Read only
-                # on conflict to report the generation that won the race.
+                # Another runtime may have inserted the same cursor after our
+                # initial read. Normalize that database race to the same CAS
+                # conflict used for concurrent updates.
                 existing = await self.load(
                     connection,
                     scope_id,

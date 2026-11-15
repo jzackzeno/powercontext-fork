@@ -22,12 +22,10 @@ reused. Queue state and retry history are deliberately absent.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from datetime import datetime
 from typing import cast
 
-from pydantic import BaseModel, ConfigDict
-from sqlalchemy import bindparam, func, insert, select, update
+from pydantic import BaseModel
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncConnection
@@ -39,19 +37,6 @@ from powercontext.builtin.persistence.tables import (
     ARTIFACT_PROCESSING_SEQUENCES_TABLE,
 )
 from powercontext.limits import MAX_BINDING_NAME_LENGTH, MAX_SCOPE_ID_LENGTH
-
-_DIRTY_BINDING_SELECTION = select(ARTIFACT_PROCESSING_INTENTS_TABLE.c.binding_name).where(
-    ARTIFACT_PROCESSING_INTENTS_TABLE.c.scope_id == bindparam("requested_scope_id"),
-    ARTIFACT_PROCESSING_INTENTS_TABLE.c.binding_name.in_(bindparam("binding_names", expanding=True)),
-)
-_DIRTY_BINDING_ADVANCE = (
-    update(ARTIFACT_PROCESSING_INTENTS_TABLE)
-    .where(
-        ARTIFACT_PROCESSING_INTENTS_TABLE.c.scope_id == bindparam("requested_scope_id"),
-        ARTIFACT_PROCESSING_INTENTS_TABLE.c.binding_name.in_(bindparam("binding_names", expanding=True)),
-    )
-    .values(dirty_generation=ARTIFACT_PROCESSING_INTENTS_TABLE.c.dirty_generation + bindparam("dirty_increment"))
-)
 
 
 class StoredArtifactProcessingIntent(BaseModel):
@@ -65,16 +50,6 @@ class StoredArtifactProcessingIntent(BaseModel):
     requested_generation: int
     handled_generation: int
     last_auto_scan_generation: int
-    consecutive_dream_attempts: int = 0
-
-
-class PendingInvocationObservation(BaseModel):
-    """Global pending Scope count and the database snapshot time in naive UTC."""
-
-    model_config = ConfigDict(frozen=True)
-
-    pending_count: int
-    observed_at: datetime
 
 
 class ArtifactProcessingIntentRepository:
@@ -141,73 +116,20 @@ class ArtifactProcessingIntentRepository:
     async def mark_dirty(
         self, connection: AsyncConnection, scope_id: str, binding_name: str, /
     ) -> StoredArtifactProcessingIntent:
-        await self.mark_dirty_many(connection, scope_id, (binding_name,))
+        await self.ensure(connection, scope_id, binding_name)
+        table = ARTIFACT_PROCESSING_INTENTS_TABLE
+        await connection.execute(
+            update(table)
+            .where(table.c.scope_id == scope_id, table.c.binding_name == binding_name)
+            .values(dirty_generation=table.c.dirty_generation + 1)
+        )
         return cast(
             StoredArtifactProcessingIntent, await self.load(connection, scope_id, binding_name, for_update=True)
         )
 
-    async def mark_dirty_many(
-        self, connection: AsyncConnection, scope_id: str, binding_names: Sequence[str], /, *, increment: int = 1
-    ) -> None:
-        """Advance each distinct binding for one or more committed inputs."""
-
-        names = tuple(dict.fromkeys(binding_names))
-        if not names:
-            return
-        if not isinstance(increment, int) or isinstance(increment, bool) or increment < 1:
-            raise InvalidRepositoryArgumentError("increment", "must be a positive integer")
-        for name in names:
-            _require_key(scope_id, name)
-        table = ARTIFACT_PROCESSING_INTENTS_TABLE
-        selection = {"requested_scope_id": scope_id, "binding_names": names}
-        existing = set((await connection.execute(_DIRTY_BINDING_SELECTION, selection)).scalars())
-        if len(existing) != len(names):
-            sequence = ARTIFACT_PROCESSING_SEQUENCES_TABLE
-            if connection.dialect.name == "sqlite":
-                seed = sqlite_insert(sequence).values(singleton=1, sequence=0).on_conflict_do_nothing()
-            elif connection.dialect.name == "mysql":
-                seed = mysql_insert(sequence).values(singleton=1, sequence=0)
-                seed = seed.on_duplicate_key_update(sequence=sequence.c.sequence)
-            else:
-                raise InvalidRepositoryArgumentError("dialect", "processing intents require SQLite or MySQL")
-            await connection.execute(seed)
-            # The global sequence lock also serializes a first registration
-            # in another Scope. Recheck after waiting for that writer.
-            await connection.execute(
-                update(sequence).where(sequence.c.singleton == 1).values(sequence=sequence.c.sequence)
-            )
-            existing = set((await connection.execute(_DIRTY_BINDING_SELECTION.with_for_update(), selection)).scalars())
-            missing = tuple(name for name in names if name not in existing)
-            if missing:
-                await connection.execute(
-                    update(sequence)
-                    .where(sequence.c.singleton == 1)
-                    .values(sequence=sequence.c.sequence + len(missing))
-                )
-                end = int(
-                    cast(int, await connection.scalar(select(sequence.c.sequence).where(sequence.c.singleton == 1)))
-                )
-                await connection.execute(
-                    insert(table),
-                    [
-                        {"binding_name": name, "scope_id": scope_id, "pending_sequence": end - len(missing) + offset}
-                        for offset, name in enumerate(missing, start=1)
-                    ],
-                )
-        await connection.execute(
-            _DIRTY_BINDING_ADVANCE,
-            {**selection, "dirty_increment": increment},
-        )
-
     async def request(
-        self,
-        connection: AsyncConnection,
-        scope_id: str,
-        binding_name: str,
-        /,
+        self, connection: AsyncConnection, scope_id: str, binding_name: str, /
     ) -> StoredArtifactProcessingIntent:
-        """Accept an invocation in the caller's transaction."""
-
         await self.ensure(connection, scope_id, binding_name)
         table = ARTIFACT_PROCESSING_INTENTS_TABLE
         await connection.execute(
@@ -215,10 +137,9 @@ class ArtifactProcessingIntentRepository:
             .where(table.c.scope_id == scope_id, table.c.binding_name == binding_name)
             .values(requested_generation=table.c.requested_generation + 1)
         )
-        current = cast(
+        return cast(
             StoredArtifactProcessingIntent, await self.load(connection, scope_id, binding_name, for_update=True)
         )
-        return current
 
     async def acknowledge(
         self,
@@ -229,7 +150,6 @@ class ArtifactProcessingIntentRepository:
         /,
         *,
         clean_generation: int | None = None,
-        dream: bool = False,
     ) -> StoredArtifactProcessingIntent:
         _require_nonnegative("generation", generation)
         current = await self.load(connection, scope_id, binding_name, for_update=True)
@@ -247,39 +167,9 @@ class ArtifactProcessingIntentRepository:
         await connection.execute(
             update(table)
             .where(table.c.scope_id == scope_id, table.c.binding_name == binding_name)
-            .values(
-                handled_generation=max(current.handled_generation, generation),
-                clean_generation=clean,
-                consecutive_dream_attempts=min(current.consecutive_dream_attempts + 1, 4) if dream else 0,
-            )
+            .values(handled_generation=max(current.handled_generation, generation), clean_generation=clean)
         )
         return cast(StoredArtifactProcessingIntent, await self.load(connection, scope_id, binding_name))
-
-    async def pending_observation(
-        self, connection: AsyncConnection, binding_name: str, /
-    ) -> PendingInvocationObservation:
-        """Count all pending Scopes, independently of discovery pages/capacity.
-
-        Call in a consistent-snapshot transaction from background observation,
-        never on scrape. The count examines this binding's existing intent rows.
-        """
-
-        from powercontext.builtin.persistence.supervision import database_utc_now
-
-        _require_identifier("binding_name", binding_name, MAX_BINDING_NAME_LENGTH)
-        intents = ARTIFACT_PROCESSING_INTENTS_TABLE
-        pending_count = await connection.scalar(
-            select(func.count())
-            .select_from(intents)
-            .where(
-                intents.c.binding_name == binding_name,
-                intents.c.requested_generation > intents.c.handled_generation,
-            )
-        )
-        return PendingInvocationObservation(
-            pending_count=int(pending_count or 0),
-            observed_at=await database_utc_now(connection),
-        )
 
     async def scan(
         self,
@@ -338,13 +228,7 @@ class ArtifactProcessingIntentRepository:
         state = (
             (
                 await connection.execute(
-                    select(
-                        state_table.c.scan_in_progress,
-                        state_table.c.scan_generation,
-                        state_table.c.scan_upper_pending_sequence,
-                    )
-                    .where(state_table.c.binding_name == binding_name)
-                    .with_for_update()
+                    select(state_table).where(state_table.c.binding_name == binding_name).with_for_update()
                 )
             )
             .mappings()
@@ -388,9 +272,4 @@ def _require_nonnegative(field: str, value: int) -> None:
 
 StoredIntent = StoredArtifactProcessingIntent
 
-__all__ = [
-    "ArtifactProcessingIntentRepository",
-    "PendingInvocationObservation",
-    "StoredArtifactProcessingIntent",
-    "StoredIntent",
-]
+__all__ = ["ArtifactProcessingIntentRepository", "StoredArtifactProcessingIntent", "StoredIntent"]

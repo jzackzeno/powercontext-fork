@@ -22,12 +22,6 @@ from pydantic import BaseModel, Field, ValidationError
 
 from powercontext.builtin.artifacts.experience.models import ExperienceContent
 from powercontext.builtin.inference import GenerationResult, InvalidInferenceOutputError, StructuredGenerator
-from powercontext.builtin.processing_diagnostics import (
-    ProcessingDiagnostics,
-    ProcessingFailureReason,
-    ProcessingStage,
-    attach_diagnostics,
-)
 from powercontext.builtin.sources import CONTENT_SOURCE_NAME, ContentSource
 from powercontext.sources import Source, SourceRef
 
@@ -142,17 +136,9 @@ def _incubation_input(
     try:
         return ExperienceIncubationInput(evidence=tuple(projected)), evidence
     except ValidationError as error:
-        raise attach_diagnostics(
-            InvalidInferenceOutputError(
-                "experience-incubate",
-                "eligible Task Outcome evidence exceeded the bounded input contract",
-            ),
-            ProcessingDiagnostics(
-                stage=ProcessingStage.BUSINESS_VALIDATION,
-                input_item_count=len(projected),
-                failure_location="experience-incubate-input",
-                cause_exception_type=type(error).__name__,
-            ),
+        raise InvalidInferenceOutputError(
+            "experience-incubate",
+            "eligible Task Outcome evidence exceeded the bounded input contract",
         ) from error
 
 
@@ -175,16 +161,9 @@ def _selected_sources(values: tuple[str, ...], evidence: dict[str, SourceRef]) -
         try:
             source = evidence[evidence_id]
         except KeyError:
-            raise attach_diagnostics(
-                InvalidInferenceOutputError(
-                    "experience-incubate",
-                    "candidate cited evidence outside the current Task Outcome window",
-                ),
-                ProcessingDiagnostics(
-                    stage=ProcessingStage.BUSINESS_VALIDATION,
-                    reason=ProcessingFailureReason.INVALID_OUTPUT,
-                    failure_location="experience-incubate-evidence",
-                ),
+            raise InvalidInferenceOutputError(
+                "experience-incubate",
+                "candidate cited evidence outside the current Task Outcome window",
             ) from None
         key = (source.source_type, source.source_id)
         if key not in seen:

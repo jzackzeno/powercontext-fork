@@ -16,11 +16,10 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
-from typing import Annotated, Literal, Protocol, TypeAlias
+from typing import Literal, Protocol, TypeAlias
 
-from pydantic import BaseModel, Field, JsonValue, TypeAdapter, ValidationError, model_validator
+from pydantic import BaseModel, JsonValue, TypeAdapter, ValidationError
 
 from powercontext.artifacts import Artifact
 from powercontext.builtin.artifacts.handoff.models import (
@@ -30,21 +29,16 @@ from powercontext.builtin.artifacts.handoff.models import (
     HandoffDraft,
     HandoffGenerationEvidence,
     HandoffGenerationRequest,
+    HandoffMemoryEvidence,
     HandoffOmission,
-    HandoffRolloverReason,
     HandoffSourceEvidence,
     HandoffStatement,
 )
+from powercontext.builtin.artifacts.memory import MemoryEntryVersion
 from powercontext.builtin.inference import GenerationResult, InvalidInferenceOutputError, StructuredGenerator
-from powercontext.builtin.processing_diagnostics import (
-    ProcessingDiagnostics,
-    ProcessingFailureReason,
-    ProcessingStage,
-    attach_diagnostics,
-)
 from powercontext.sources import Source
 
-HandoffGenerationEvidenceType: TypeAlias = Literal["source", "artifact"]
+HandoffGenerationEvidenceType: TypeAlias = Literal["source", "artifact", "memory"]
 
 _JSON_VALUE = TypeAdapter(JsonValue)
 
@@ -61,19 +55,8 @@ class HandoffGenerationInput(BaseModel):
     """Caller-owned objective, bounded evidence, and output budget."""
 
     objective: str
-    rollover_reasons: Annotated[
-        tuple[HandoffRolloverReason, ...],
-        Field(max_length=6),
-    ] = ()
     evidence: tuple[HandoffGenerationEvidenceInput, ...]
     max_bytes: int
-
-    @model_validator(mode="after")
-    def require_unique_rollover_reasons(self) -> HandoffGenerationInput:
-        for index, reason in enumerate(self.rollover_reasons):
-            if reason in self.rollover_reasons[:index]:
-                raise ValueError("Handoff rollover reasons must be unique")  # noqa: TRY003
-        return self
 
 
 class HandoffGenerationStatement(BaseModel):
@@ -106,6 +89,8 @@ class HandoffEvidenceProjector(Protocol):
 
     def project_artifact(self, artifact: Artifact[object], /) -> JsonValue: ...
 
+    def project_memory_entry(self, entry: MemoryEntryVersion, /) -> JsonValue: ...
+
 
 class DefaultHandoffEvidenceProjector:
     """Expose stable public evidence fields unless a caller opts in to more."""
@@ -122,7 +107,15 @@ class DefaultHandoffEvidenceProjector:
             "artifact_id": artifact.artifact_id,
             "revision": artifact.revision,
             "family": artifact.family,
-            "content": artifact.model_dump(mode="json")["content"],
+            "content": artifact.content,
+        })
+
+    def project_memory_entry(self, entry: MemoryEntryVersion, /) -> JsonValue:
+        return _validated_json({
+            "entry_id": entry.entry_id,
+            "entry_version_id": entry.entry_version_id,
+            "kind": entry.kind,
+            "text": entry.text,
         })
 
 
@@ -152,17 +145,9 @@ class LLMHandoffGenerationPipeline:
                 omissions=tuple(_omission(value, citations) for value in output.omissions),
             )
         except ValidationError as error:
-            raise attach_diagnostics(
-                InvalidInferenceOutputError(
-                    "handoff-generate",
-                    "generated content violates the Handoff Draft contract",
-                ),
-                ProcessingDiagnostics(
-                    stage=ProcessingStage.BUSINESS_VALIDATION,
-                    reason=ProcessingFailureReason.INVALID_OUTPUT,
-                    failure_location="handoff-generate-contract",
-                    cause_exception_type=type(error).__name__,
-                ),
+            raise InvalidInferenceOutputError(
+                "handoff-generate",
+                "generated content violates the Handoff Draft contract",
             ) from error
 
 
@@ -173,32 +158,6 @@ def _validated_output(result: GenerationResult[HandoffGenerationOutput]) -> Hand
         return HandoffGenerationOutput.model_validate(result.output)
     except ValidationError as error:
         raise InvalidInferenceOutputError("handoff-generate", "generator returned an invalid output tree") from error
-
-
-_ROLLOVER_TRANSCRIPT_INSTRUCTION = re.compile(
-    r"\b(?:continue\s+(?:the\s+previous\s+work|above)|see\s+the\s+conversation\s+above)\s*[.!?]*\s*\Z",
-    re.IGNORECASE,
-)
-
-
-def rollover_draft_violation(draft: HandoffDraft) -> str | None:
-    """Return the deterministic RFC 1783 rollover violation, if any.
-
-    The caller owns ``objective`` and the generator must preserve it exactly, so this checks
-    only generated checkpoint content. It rejects a direct instruction to rely on an old
-    transcript, not a descriptive or quoted mention of that instruction. A blocked checkpoint
-    may have no next action because the blocker itself explains why the fresh session cannot
-    continue safely.
-    """
-
-    if draft.next_action is None and draft.disposition == "continuable":
-        return "rollover_next_action"
-    texts = [*(statement.text for statement in draft.state)]
-    if draft.next_action is not None:
-        texts.append(draft.next_action.text)
-    if any(_ROLLOVER_TRANSCRIPT_INSTRUCTION.search(text) for text in texts):
-        return "rollover_quality"
-    return None
 
 
 def _generation_input(
@@ -220,7 +179,6 @@ def _generation_input(
     return (
         HandoffGenerationInput(
             objective=request.objective,
-            rollover_reasons=request.rollover_reasons,
             evidence=tuple(values),
             max_bytes=request.max_bytes,
         ),
@@ -236,6 +194,8 @@ def _project_evidence(
         return _validated_json(projector.project_source(evidence.source))
     if isinstance(evidence, HandoffArtifactEvidence):
         return _validated_json(projector.project_artifact(evidence.artifact))
+    if isinstance(evidence, HandoffMemoryEvidence):
+        return _validated_json(projector.project_memory_entry(evidence.entry))
     raise TypeError(f"unsupported Handoff evidence: {type(evidence).__name__}")  # noqa: TRY003
 
 
@@ -244,7 +204,7 @@ def _statement(
     citations: Mapping[str, HandoffCitation],
 ) -> HandoffStatement:
     if not value.evidence_ids:
-        raise _invalid_handoff_output("statement does not cite evidence", "handoff-generation-citation")  # noqa: TRY003
+        raise InvalidInferenceOutputError("handoff-generate", "statement does not cite evidence")
     return HandoffStatement(
         text=value.text,
         citations=tuple(_citation(evidence_id, citations) for evidence_id in dict.fromkeys(value.evidence_ids)),
@@ -265,20 +225,10 @@ def _citation(evidence_id: str, citations: Mapping[str, HandoffCitation]) -> Han
     try:
         return citations[evidence_id]
     except KeyError:
-        raise _invalid_handoff_output(  # noqa: TRY003
-            "generated content cites evidence outside the request", "handoff-generation-citation"
+        raise InvalidInferenceOutputError(
+            "handoff-generate",
+            "generated content cites evidence outside the request",
         ) from None
-
-
-def _invalid_handoff_output(detail: str, location: str) -> InvalidInferenceOutputError:
-    return attach_diagnostics(
-        InvalidInferenceOutputError("handoff-generate", detail),
-        ProcessingDiagnostics(
-            stage=ProcessingStage.BUSINESS_VALIDATION,
-            reason=ProcessingFailureReason.INVALID_OUTPUT,
-            failure_location=location,
-        ),
-    )
 
 
 def _validated_json(value: object) -> JsonValue:
