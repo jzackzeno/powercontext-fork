@@ -105,10 +105,14 @@ from powercontext.builtin.artifacts.topic_memory import (
     PublishedTopicMemory,
     TopicMemory,
     TopicMemoryBrowseCursor,
+    TopicMemoryCapabilityError,
     TopicMemoryCurrentItem,
     TopicMemorySearchMode,
     TopicMemorySearchResult,
+    chunk_topic_memory_detail,
+    prepare_topic_memory_projection,
 )
+from powercontext.builtin.artifacts.topic_memory.errors import TopicMemoryStorageInvariantError
 from powercontext.builtin.context import BuiltinArtifacts, BuiltinSources
 from powercontext.builtin.dream.generation import DreamGenerator
 from powercontext.builtin.dream.models import DreamBudget, DreamOperation
@@ -152,6 +156,10 @@ from powercontext.builtin.persistence.recurrence import RecurrenceRepository
 from powercontext.builtin.persistence.skill_packages import SkillPackageRepository
 from powercontext.builtin.persistence.skill_publications import SkillPublicationRepository
 from powercontext.builtin.persistence.source_definitions import SourceDefinitionManifestRepository
+from powercontext.builtin.persistence.source_lifecycle import (
+    SourceLifecycleRepository,
+    SourceLifecycleState,
+)
 from powercontext.builtin.persistence.sources import SourceRepository, StoredSource
 from powercontext.builtin.persistence.statistics import StatisticsRepository
 from powercontext.builtin.persistence.supervision import (
@@ -272,6 +280,7 @@ class _Repositories:
     governance: ArtifactGovernanceRepository
     candidates: CandidateRepository
     connector_checkpoints: ConnectorCheckpointRepository
+    source_lifecycle: SourceLifecycleRepository
     source_definitions: SourceDefinitionManifestRepository
     cursors: SourceCursorRepository
     external_skills: ExternalSkillRepository
@@ -570,6 +579,7 @@ class RelationalContexts:
                 Profile.family: ProfileCandidateProposal,
             }),
             connector_checkpoints=ConnectorCheckpointRepository(),
+            source_lifecycle=SourceLifecycleRepository(),
             source_definitions=SourceDefinitionManifestRepository(),
             cursors=SourceCursorRepository(),
             external_skills=ExternalSkillRepository(),
@@ -872,6 +882,62 @@ class RelationalContexts:
                 expected=request.expected,
             )
         return ConnectorCheckpointState(binding=request.binding, checkpoint=request.checkpoint)
+
+    async def source_lifecycle_state(self, scope_id: str, /) -> SourceLifecycleState | None:
+        """Read one scope's Source lifecycle graph, or None when never registered."""
+
+        scope = validate_scope_id(scope_id)
+        async with self.database.transaction() as connection:
+            return await self.repositories.source_lifecycle.load(connection, scope)
+
+    async def commit_source_lifecycle_state(
+        self,
+        scope_id: str,
+        state: SourceLifecycleState,
+        /,
+        *,
+        expected: SourceLifecycleState | None,
+    ) -> None:
+        """Commit one scope's lifecycle graph only when its starting value still matches."""
+
+        scope = validate_scope_id(scope_id)
+        async with self.database.transaction() as connection:
+            await self.repositories.source_lifecycle.save(connection, scope, state, expected=expected)
+
+    async def deactivate_topic_memory(self, scope_id: str, ref: ArtifactRef, /) -> bool:
+        """Remove one topic from active search and browse without deleting revisions."""
+
+        scope = validate_scope_id(scope_id)
+        async with self.database.transaction() as connection:
+            return await self.repositories.topic_memories.deactivate(connection, scope, ref)
+
+    async def reactivate_topic_memory(self, scope_id: str, ref: ArtifactRef, /) -> None:
+        """Restore one exact topic revision to active search and browse."""
+
+        scope = validate_scope_id(scope_id)
+        async with self.database.transaction() as connection:
+            topic = await self.repositories.artifacts.get(connection, scope, ref)
+            if not isinstance(topic, TopicMemory):
+                raise TopicMemoryStorageInvariantError("artifact-type", ref)
+            capabilities = self.topic_memory_index.capabilities
+            if not capabilities.vector:
+                projection = prepare_topic_memory_projection(topic.content)
+            else:
+                model = self._embedding_model
+                if model is None or model.profile != capabilities.embedding_profile:
+                    raise TopicMemoryCapabilityError("embedding-profile")
+                chunks = chunk_topic_memory_detail(topic.content.detail)
+                texts = (f"{topic.content.title}\n{topic.content.summary}", *(chunk.text for chunk in chunks))
+                result = await model.embed(texts)
+                if len(result.vectors) != len(texts):
+                    raise InvalidInferenceOutputError("topic-memory.index", "requires one vector per input")
+                projection = prepare_topic_memory_projection(
+                    topic.content,
+                    topic_embedding=result.vectors[0],
+                    chunk_embeddings=result.vectors[1:],
+                    embedding_profile=model.profile,
+                )
+            await self.repositories.topic_memories.reactivate(connection, scope, topic, projection)
 
     async def estimate_recall_tokens(
         self,

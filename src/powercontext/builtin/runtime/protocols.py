@@ -20,7 +20,9 @@ from collections.abc import Mapping
 from contextlib import AbstractContextManager
 from typing import Protocol, TypeVar
 
+from powercontext.artifacts import ArtifactRef
 from powercontext.builtin.artifacts.handoff import ActivateHandoff, HandoffActivation
+from powercontext.builtin.persistence.source_lifecycle import SourceLifecycleState
 from powercontext.builtin.runtime.models import (
     CommitConnectorCheckpoint,
     ConnectorCheckpointState,
@@ -73,6 +75,21 @@ class PowerContextProvider(Protocol[SourcesT, ArtifactsT, TriggersT]):
     async def scope_ids(self) -> tuple[str, ...]: ...
 
     async def pending_source_count(self, scope_id: str, binding_name: str, /) -> int: ...
+
+    async def source_lifecycle_state(self, scope_id: str, /) -> SourceLifecycleState | None: ...
+
+    async def commit_source_lifecycle_state(
+        self,
+        scope_id: str,
+        state: SourceLifecycleState,
+        /,
+        *,
+        expected: SourceLifecycleState | None,
+    ) -> None: ...
+
+    async def deactivate_topic_memory(self, scope_id: str, ref: ArtifactRef, /) -> bool: ...
+
+    async def reactivate_topic_memory(self, scope_id: str, ref: ArtifactRef, /) -> None: ...
 
 
 class RemoteIngestion(Protocol):

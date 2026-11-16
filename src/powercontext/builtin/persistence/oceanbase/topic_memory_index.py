@@ -164,6 +164,17 @@ class OceanBaseTopicMemoryFTSIndex:
     ) -> None:
         pass
 
+    async def remove(
+        self,
+        _connection: AsyncConnection,
+        _scope_id: str,
+        _topic_ref: ArtifactRef,
+        /,
+    ) -> None:
+        # Search reads the active projection tables directly, so removing
+        # the active row is the whole removal; there is nothing to index.
+        pass
+
     async def search(
         self,
         connection: AsyncConnection,
@@ -393,6 +404,26 @@ class OceanBaseTopicMemoryVectorIndex:
 
     async def validate_current(self, connection: AsyncConnection, /) -> None:
         await validate_current_topic_vectors(connection, self.topic_table, self.chunk_table, self._fingerprint)
+
+    async def remove(
+        self,
+        connection: AsyncConnection,
+        scope_id: str,
+        topic_ref: ArtifactRef,
+        /,
+    ) -> None:
+        await connection.execute(
+            delete(self.chunk_table).where(
+                self.chunk_table.c.scope_id == scope_id,
+                self.chunk_table.c.artifact_id == topic_ref.artifact_id,
+            )
+        )
+        await connection.execute(
+            delete(self.topic_table).where(
+                self.topic_table.c.scope_id == scope_id,
+                self.topic_table.c.artifact_id == topic_ref.artifact_id,
+            )
+        )
 
     async def replace(
         self,

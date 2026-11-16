@@ -50,6 +50,7 @@ from powercontext.builtin.artifacts.topic_memory import (
 from powercontext.builtin.artifacts.topic_memory.fusion import _fuse_topic_memory_rankings
 from powercontext.builtin.persistence.artifacts import ArtifactRepository
 from powercontext.builtin.persistence.errors import InvalidRepositoryArgumentError
+from powercontext.builtin.persistence.source_lifecycle import unavailable_topic_refs
 from powercontext.builtin.persistence.supervision import database_utc_now
 from powercontext.builtin.persistence.tables import (
     ARTIFACT_HEADS_TABLE,
@@ -175,7 +176,7 @@ class TopicMemoryRepository:
             .correlate(ARTIFACT_HEADS_TABLE)
             .scalar_subquery()
         )
-        invalid_head = (
+        invalid_heads = (
             (
                 await connection.execute(
                     select(
@@ -198,14 +199,18 @@ class TopicMemoryRepository:
                             chunk_count == 0,
                         ),
                     )
-                    .limit(1)
                 )
             )
             .mappings()
-            .one_or_none()
+            .all()
         )
-        if invalid_head is not None:
-            row = invalid_head
+        # A lifecycle withdrawal deliberately leaves its Topic head without
+        # an active projection; only those heads are exempt from the
+        # corruption check, so an unrelated missing head still fails here.
+        exempt_heads = await unavailable_topic_refs(connection) if invalid_heads else set()
+        for row in invalid_heads:
+            if (str(row["scope_id"]), str(row["artifact_id"])) in exempt_heads:
+                continue
             ref = ArtifactRef(
                 family=TopicMemory.family,
                 artifact_id=str(row["artifact_id"]),
@@ -501,6 +506,55 @@ class TopicMemoryRepository:
             ),
         )
 
+    async def deactivate(
+        self,
+        connection: AsyncConnection,
+        scope_id: str,
+        ref: ArtifactRef,
+        /,
+    ) -> bool:
+        """Remove one topic from active search and browse without deleting revisions.
+
+        Returns whether the topic was active. Deactivating an already
+        inactive topic is a no-op, so a retried propagation converges.
+        """
+
+        if ref.family != TopicMemory.family:
+            raise InvalidRepositoryArgumentError("artifact_ref", "must reference topic-memory")
+        await self.index.remove(connection, scope_id, ref)
+        await connection.execute(
+            delete(TOPIC_MEMORY_ACTIVE_CHUNKS_TABLE).where(
+                TOPIC_MEMORY_ACTIVE_CHUNKS_TABLE.c.scope_id == scope_id,
+                TOPIC_MEMORY_ACTIVE_CHUNKS_TABLE.c.artifact_id == ref.artifact_id,
+            )
+        )
+        result = await connection.execute(
+            delete(TOPIC_MEMORY_ACTIVE_TOPICS_TABLE).where(
+                TOPIC_MEMORY_ACTIVE_TOPICS_TABLE.c.scope_id == scope_id,
+                TOPIC_MEMORY_ACTIVE_TOPICS_TABLE.c.artifact_id == ref.artifact_id,
+            )
+        )
+        return result.rowcount == 1
+
+    async def reactivate(
+        self,
+        connection: AsyncConnection,
+        scope_id: str,
+        topic: TopicMemory,
+        projection: TopicMemoryProjection,
+        /,
+    ) -> None:
+        """Restore one exact topic revision to active search and browse.
+
+        Unlike publication, this creates no new revision and no new
+        publication row: the revision was already published, so its
+        ``published_at`` ordering is preserved.
+        """
+
+        projection = self._validate_projection(TopicMemoryDraft(content=topic.content), projection)
+        await self._ensure_retrieval_shape(connection)
+        await self._publish_active(connection, scope_id, topic, projection)
+
     async def _activate(
         self,
         connection: AsyncConnection,
@@ -519,6 +573,19 @@ class TopicMemoryRepository:
                 published_at=published_at,
             )
         )
+        await self._publish_active(connection, scope_id, topic, projection)
+        return published_at
+
+    async def _publish_active(
+        self,
+        connection: AsyncConnection,
+        scope_id: str,
+        topic: TopicMemory,
+        projection: TopicMemoryProjection,
+    ) -> None:
+        """Replace the active projection rows and index entries for one revision."""
+
+        ref = topic.as_ref()
         await self.index.replace(connection, scope_id, ref, projection)
         await connection.execute(
             delete(TOPIC_MEMORY_ACTIVE_CHUNKS_TABLE).where(
@@ -562,7 +629,6 @@ class TopicMemoryRepository:
                 for chunk in projection.chunks
             ],
         )
-        return published_at
 
     def _validate_projection(
         self,
