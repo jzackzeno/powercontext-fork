@@ -28,6 +28,7 @@ from powercontext.builtin.artifacts.memory.models import MemoryCitation, MemoryH
 from powercontext.builtin.artifacts.profile.models import Profile
 from powercontext.builtin.artifacts.topic_memory import TopicMemory, TopicMemorySearchHit
 from powercontext.builtin.runtime.errors import PreparedContextInvariantError
+from powercontext.builtin.runtime.evidence_selection import score_sentences, split_sentences, tokenize
 from powercontext.builtin.runtime.models import PrepareContextRequest, PreparedContext
 from powercontext.builtin.runtime.prepared_code import (
     CodeEvidenceRef,
@@ -56,6 +57,53 @@ class _PreparedContextEntry:
     citation: dict[str, object]
     content: str
     truncated: bool
+
+
+@dataclass(frozen=True)
+class _EvidenceEntry:
+    """One Memory candidate entry available to evidence selection."""
+
+    scope_id: str
+    memory_ref: ArtifactRef
+    entry_id: str
+    entry_version_id: str
+    text: str
+
+
+@dataclass(frozen=True)
+class _EvidenceSentence:
+    """One scored sentence inside an evidence entry."""
+
+    entry_index: int
+    sentence_index: int
+    start: int
+    end: int
+    score: float
+
+
+@dataclass(frozen=True)
+class _EvidenceDraft:
+    """A fragment under construction: consecutive sentences of one entry."""
+
+    entry_index: int
+    first_sentence_index: int
+    last_sentence_index: int
+    start: int
+    end: int
+    score: float
+
+
+@dataclass(frozen=True)
+class _EvidenceItem:
+    """One packed fragment, ready to render."""
+
+    scope_id: str
+    memory_ref: ArtifactRef
+    entry_id: str
+    entry_version_id: str
+    start: int
+    end: int
+    text: str
 
 
 @dataclass(frozen=True)
@@ -106,6 +154,7 @@ class PreparedContextBuild:
     origins: tuple[PreparedContextOrigin, ...]
     omissions: PreparedContextOmissions = PreparedContextOmissions()
     code_origins: tuple[CodeEvidenceRef, ...] = ()
+    fragments: tuple[PreparedEvidenceFragment, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -115,6 +164,20 @@ class MemoryEntryAddress:
     memory: ArtifactAddress
     entry_id: str
     entry_version_id: str
+
+
+@dataclass(frozen=True)
+class PreparedEvidenceFragment:
+    """One verbatim span of a Memory entry, with its exact address.
+
+    ``text`` is always ``entry.text[start:end]``: the fragment is a literal
+    slice of the original entry, never a rewrite or summary.
+    """
+
+    address: MemoryEntryAddress
+    start: int
+    end: int
+    text: str
 
 
 PreparedContextOrigin = MemoryCitation | ArtifactRef | MemoryEntryAddress | ArtifactAddress
@@ -235,7 +298,7 @@ class PreparedContextBuilder:
         if sum(len(candidates.hits) for candidates in experience_candidates) > self.experience_candidate_limit:
             raise PreparedContextInvariantError("experience-candidate-limit")
 
-        content, origins, omissions = self._select_entries(
+        content, origins, omissions, fragments = self._select_entries(
             request=request,
             current_scope_id=current_scope_id,
             memory_candidates=memory_candidates,
@@ -254,6 +317,7 @@ class PreparedContextBuilder:
             context=PreparedContext(status="ready", content=content, content_bytes=content_bytes),
             origins=origins,
             omissions=omissions,
+            fragments=fragments,
         )
 
     def probe_budget(
@@ -277,7 +341,7 @@ class PreparedContextBuilder:
         counters because both go through :meth:`_select_entries`.
         """
 
-        content, origins, omissions = self._select_entries(
+        content, origins, omissions, _fragments = self._select_entries(
             request=request,
             current_scope_id=current_scope_id,
             memory_candidates=memory_candidates,
@@ -303,17 +367,27 @@ class PreparedContextBuilder:
         topic_memory_hits: Sequence[TopicMemorySearchHit],
         experience_candidates: Sequence[PreparedExperienceCandidates],
         profile_candidates: Sequence[PreparedProfileCandidate],
-    ) -> tuple[str | None, tuple[PreparedContextOrigin, ...], PreparedContextOmissions]:
+    ) -> tuple[
+        str | None, tuple[PreparedContextOrigin, ...], PreparedContextOmissions, tuple[PreparedEvidenceFragment, ...]
+    ]:
         """Run one complete pure selection pass and render it.
 
-        Returns ``(content, origins, omissions)``; ``content`` is ``None`` exactly when nothing
-        was selected, which is the empty-result case for both paths. This is the single
+        Returns ``(content, origins, omissions, fragments)``; ``content`` is ``None`` exactly
+        when nothing was selected, which is the empty-result case for every path, and
+        ``fragments`` is non-empty only for the evidence-selection path. This is the single
         selection path shared by :meth:`build_scopes_result` and :meth:`probe_budget`, so the
         probe's counters always describe the selection the build would actually perform.
         """
 
+        if request.evidence_selection:
+            return self._select_evidence(
+                request,
+                current_scope_id=current_scope_id,
+                memory_candidates=memory_candidates,
+            )
+
         if request.assembly is not None:
-            return self._select_text(
+            content, origins, omissions = self._select_text(
                 request,
                 current_scope_id=current_scope_id,
                 memory_candidates=memory_candidates,
@@ -321,6 +395,7 @@ class PreparedContextBuilder:
                 profile_candidates=profile_candidates,
                 topic_memory_hits=topic_memory_hits,
             )
+            return content, origins, omissions, ()
 
         memory_entries = _interleave_groups(
             tuple(
@@ -344,8 +419,218 @@ class PreparedContextBuilder:
         )[: self.experience_entry_limit]
         entries, omissions = self._fit_entries(request, memory_entries, topic_memory_entries, experience_entries)
         if not entries:
-            return None, (), omissions
-        return _render(entries), tuple(entry.origin for entry in entries), omissions
+            return None, (), omissions, ()
+        return _render(entries), tuple(entry.origin for entry in entries), omissions, ()
+
+    def _select_evidence(
+        self,
+        request: PrepareContextRequest,
+        *,
+        current_scope_id: str | None,
+        memory_candidates: Sequence[PreparedMemoryCandidates],
+    ) -> tuple[
+        str | None, tuple[PreparedContextOrigin, ...], PreparedContextOmissions, tuple[PreparedEvidenceFragment, ...]
+    ]:
+        """Select verbatim query-relevant sentences under the byte budget.
+
+        Only Memory candidates participate. Each candidate entry is split
+        into sentences, ranked against the query with BM25, and packed
+        greedily by score; consecutive selected sentences from one entry
+        merge into a single fragment so the budget pays one citation per
+        merged span instead of one per sentence. Every packed fragment is
+        measured by rendering the complete output, so the byte budget
+        covers trust policy, envelope, JSON, citations, and text.
+        """
+
+        entries = self._evidence_entries(memory_candidates)
+        sentences: list[_EvidenceSentence] = []
+        for entry_index, entry in enumerate(entries):
+            spans = split_sentences(entry.text)
+            texts = tuple(entry.text[start:end] for start, end in spans)
+            for sentence_index, (span, score) in enumerate(
+                zip(spans, score_sentences(request.query, texts), strict=True), start=0
+            ):
+                sentences.append(
+                    _EvidenceSentence(
+                        entry_index=entry_index,
+                        sentence_index=sentence_index,
+                        start=span[0],
+                        end=span[1],
+                        score=score,
+                    )
+                )
+        eligible = [sentence for sentence in sentences if sentence.score > 0]
+        ranked = sorted(
+            eligible, key=lambda sentence: (-sentence.score, sentence.end - sentence.start, sentence.entry_index)
+        )
+        drafts, dropped = self._pack_evidence(request, entries, sentences, ranked)
+        if not drafts:
+            return (
+                None,
+                (),
+                PreparedContextOmissions(dropped_items=len(eligible), dropped_no_fitting_truncation=len(eligible)),
+                (),
+            )
+        items = _draft_items(entries, drafts)
+        fragments: list[PreparedEvidenceFragment] = []
+        origins: list[PreparedContextOrigin] = []
+        for item in items:
+            address = MemoryEntryAddress(
+                memory=ArtifactAddress(scope_id=item.scope_id, artifact=item.memory_ref),
+                entry_id=item.entry_id,
+                entry_version_id=item.entry_version_id,
+            )
+            fragments.append(PreparedEvidenceFragment(address=address, start=item.start, end=item.end, text=item.text))
+            if item.scope_id == current_scope_id:
+                origins.append(
+                    MemoryCitation(
+                        memory_ref=item.memory_ref,
+                        entry_id=item.entry_id,
+                        entry_version_id=item.entry_version_id,
+                    )
+                )
+            else:
+                origins.append(address)
+        omissions = PreparedContextOmissions(dropped_items=dropped, dropped_no_fitting_truncation=dropped)
+        return _render_evidence(items), tuple(origins), omissions, tuple(fragments)
+
+    def _evidence_entries(self, memory_candidates: Sequence[PreparedMemoryCandidates]) -> tuple[_EvidenceEntry, ...]:
+        entries: list[_EvidenceEntry] = []
+        seen: set[tuple[str, str]] = set()
+        for group in memory_candidates:
+            if group.hits and group.memory_ref is None:
+                raise PreparedContextInvariantError("memory-ref-missing")
+            for hit in group.hits:
+                if hit.memory_ref != group.memory_ref:
+                    raise PreparedContextInvariantError("memory-ref-mismatch")
+                citation_key = (hit.entry_id, hit.entry_version_id)
+                if citation_key in seen:
+                    continue
+                seen.add(citation_key)
+                if not hit.entry_id.strip() or not hit.entry_version_id.strip() or not hit.text.strip():
+                    continue
+                entries.append(
+                    _EvidenceEntry(
+                        scope_id=group.scope_id,
+                        memory_ref=hit.memory_ref,
+                        entry_id=hit.entry_id,
+                        entry_version_id=hit.entry_version_id,
+                        text=hit.text,
+                    )
+                )
+        return tuple(entries)
+
+    def _pack_evidence(
+        self,
+        request: PrepareContextRequest,
+        entries: Sequence[_EvidenceEntry],
+        sentences: Sequence[_EvidenceSentence],
+        ranked: Sequence[_EvidenceSentence],
+    ) -> tuple[list[_EvidenceDraft], int]:
+        """Greedily pack ranked sentences into fragments under the byte budget.
+
+        Consecutive sentences from one entry merge into a single fragment,
+        so the budget pays one citation per merged span. A sentence that
+        does not fit, merged or alone, is dropped and counted. Packed
+        fragments then grow into adjacent sentences with leftover budget
+        (see :meth:`_expand_evidence`).
+        """
+
+        drafts: list[_EvidenceDraft] = []
+        dropped = 0
+        for sentence in ranked:
+            draft_index = next(
+                (
+                    index
+                    for index, draft in enumerate(drafts)
+                    if draft.entry_index == sentence.entry_index
+                    and (
+                        draft.last_sentence_index + 1 == sentence.sentence_index
+                        or draft.first_sentence_index - 1 == sentence.sentence_index
+                    )
+                ),
+                None,
+            )
+            if draft_index is None:
+                candidate = _EvidenceDraft(
+                    entry_index=sentence.entry_index,
+                    first_sentence_index=sentence.sentence_index,
+                    last_sentence_index=sentence.sentence_index,
+                    start=sentence.start,
+                    end=sentence.end,
+                    score=sentence.score,
+                )
+                trial = [*drafts, candidate]
+            else:
+                draft = drafts[draft_index]
+                candidate = _EvidenceDraft(
+                    entry_index=draft.entry_index,
+                    first_sentence_index=min(draft.first_sentence_index, sentence.sentence_index),
+                    last_sentence_index=max(draft.last_sentence_index, sentence.sentence_index),
+                    start=min(draft.start, sentence.start),
+                    end=max(draft.end, sentence.end),
+                    score=max(draft.score, sentence.score),
+                )
+                trial = [candidate if index == draft_index else draft for index, draft in enumerate(drafts)]
+            if len(_render_evidence(_draft_items(entries, trial)).encode("utf-8")) <= request.max_bytes:
+                drafts = trial
+            else:
+                dropped += 1
+        return self._expand_evidence(request, entries, sentences, drafts), dropped
+
+    def _expand_evidence(
+        self,
+        request: PrepareContextRequest,
+        entries: Sequence[_EvidenceEntry],
+        sentences: Sequence[_EvidenceSentence],
+        drafts: list[_EvidenceDraft],
+    ) -> list[_EvidenceDraft]:
+        """Spend leftover budget expanding packed fragments into neighbors.
+
+        Evidence often spans several sentences, and a supporting sentence
+        may share few query terms with the claim itself. The best-scoring
+        neighbor goes first, then the one sharing the most terms with its
+        fragment. Expansion only spends budget the scored sentences left
+        unused, so it never displaces them.
+        """
+
+        by_entry: dict[int, list[_EvidenceSentence]] = {}
+        for sentence in sentences:
+            by_entry.setdefault(sentence.entry_index, []).append(sentence)
+        while drafts:
+            candidates: list[tuple[float, int, _EvidenceDraft, _EvidenceSentence]] = []
+            for draft in drafts:
+                entry = entries[draft.entry_index]
+                draft_tokens = tokenize(entry.text[draft.start : draft.end])
+                entry_sentences = by_entry[draft.entry_index]
+                for neighbor_index in (draft.first_sentence_index - 1, draft.last_sentence_index + 1):
+                    if neighbor_index < 0 or neighbor_index >= len(entry_sentences):
+                        continue
+                    neighbor = entry_sentences[neighbor_index]
+                    neighbor_tokens = tokenize(entry.text[neighbor.start : neighbor.end])
+                    overlap = sum((neighbor_tokens & draft_tokens).values())
+                    candidates.append((neighbor.score, overlap, draft, neighbor))
+            if not candidates:
+                break
+            candidates.sort(key=lambda item: (-item[0], -item[1], item[2].entry_index, item[2].start))
+            expanded = False
+            for _score, _overlap, draft, neighbor in candidates:
+                candidate = _EvidenceDraft(
+                    entry_index=draft.entry_index,
+                    first_sentence_index=min(draft.first_sentence_index, neighbor.sentence_index),
+                    last_sentence_index=max(draft.last_sentence_index, neighbor.sentence_index),
+                    start=min(draft.start, neighbor.start),
+                    end=max(draft.end, neighbor.end),
+                    score=draft.score,
+                )
+                trial = [candidate if item is draft else item for item in drafts]
+                if len(_render_evidence(_draft_items(entries, trial)).encode("utf-8")) <= request.max_bytes:
+                    drafts = trial
+                    expanded = True
+                    break
+            if not expanded:
+                break
+        return drafts
 
     def _select_text(
         self,
@@ -686,12 +971,46 @@ def _interleave_groups(groups: Sequence[Sequence[_Item]]) -> tuple[_Item, ...]:
 
 
 def _render(entries: Sequence[_PreparedContextEntry]) -> str:
-    envelope = {
-        "trust": "untrusted_history",
-        "items": [_render_entry(entry) for entry in entries],
-    }
+    return _envelope([_render_entry(entry) for entry in entries])
+
+
+def _render_evidence(items: Sequence[_EvidenceItem]) -> str:
+    return _envelope([
+        {
+            "citation": {
+                "scope_id": item.scope_id,
+                "memory_ref": item.memory_ref.model_dump(mode="json"),
+                "entry_id": item.entry_id,
+                "entry_version_id": item.entry_version_id,
+            },
+            "content": item.text,
+            "start": item.start,
+            "end": item.end,
+        }
+        for item in items
+    ])
+
+
+def _envelope(items: Sequence[dict[str, object]]) -> str:
+    envelope = {"trust": "untrusted_history", "items": list(items)}
     encoded = json.dumps(envelope, ensure_ascii=False, separators=(",", ":"))
     return "\n\n".join((TRUST_POLICY, f"{_BEGIN_MARKER}\n{encoded}\n{_END_MARKER}"))
+
+
+def _draft_items(entries: Sequence[_EvidenceEntry], drafts: Sequence[_EvidenceDraft]) -> tuple[_EvidenceItem, ...]:
+    ordered = sorted(drafts, key=lambda draft: (-draft.score, draft.entry_index, draft.start))
+    return tuple(
+        _EvidenceItem(
+            scope_id=entries[draft.entry_index].scope_id,
+            memory_ref=entries[draft.entry_index].memory_ref,
+            entry_id=entries[draft.entry_index].entry_id,
+            entry_version_id=entries[draft.entry_index].entry_version_id,
+            start=draft.start,
+            end=draft.end,
+            text=entries[draft.entry_index].text[draft.start : draft.end],
+        )
+        for draft in ordered
+    )
 
 
 def _text_item(entry: _PreparedContextEntry) -> ContextTextItem:
